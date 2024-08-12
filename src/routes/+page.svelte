@@ -103,7 +103,7 @@
       border-radius: 4px;
       font-size: 1rem;
     }
-    .login-form button, .search-form button {
+    .login-form button, .search-form button, .navigation-button {
       padding: 0.5rem;
       background: #007bff;
       color: #fff;
@@ -165,7 +165,8 @@
       <a class="link help-link" href="https://bugzilla.mozilla.org/userprefs.cgi?tab=apikey" target="_blank">Need help getting an API key?</a>
     {/if}
   
-    <a class="link" href="/products">Go to Products Page</a>
+    <p></p>
+    <button class="navigation-button" on:click={() => goto("./products")}>Go to Products Page</button>
     <p></p>
   
     <form class="search-form" on:submit|preventDefault={handleBugSearch}>
@@ -182,5 +183,7 @@
       <input type="text" bind:value={$whiteboard} placeholder="Search for bug by whiteboard" />
       <button type="submit">Search</button>
     </form>
+
+    <button class="navigation-button" on:click={() => goto("./sprints")}>Go to Sprints</button>
   </div>
   

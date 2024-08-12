@@ -1,10 +1,11 @@
 <script>
     import { onMount } from 'svelte';
-    import { page } from '$app/stores';
+    import { writable, get } from 'svelte/store';
     import { goto } from '$app/navigation';
     import { searchWhiteboard, updateBug } from '../../../../api/api';
-    import { writable, get } from 'svelte/store';
     import { whiteboardBugCache } from '../../../../stores/bugStore';
+  
+    export let whiteboard;
   
     let bugs = [];
     let filteredBugs = [];
@@ -19,7 +20,6 @@
     let notification = writable('');
     let notificationType = writable(''); // success or error
     let updating = false; // To track the updating state
-    $: whiteboard = $page.params.whiteboard;
   
     const statusColors = {
       NEW: '#f8d7da',
@@ -49,7 +49,7 @@
           filteredBugs = fetchedBugs;
           whiteboardBugCache.update(cache => ({ ...cache, [whiteboard]: fetchedBugs })); // Update the cache
         }
-        
+  
         error = null;
       } catch (err) {
         console.error('Failed to fetch bugs:', err);
@@ -279,7 +279,7 @@
     .progress-bar-container {
       display: flex;
       width: 100%;
-      height: 40px;
+      height: 20px;
       margin-top: 20px;
       border-radius: 10px;
       overflow: hidden;

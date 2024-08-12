@@ -24,7 +24,7 @@
       status.set(bug.status);
       priority.set(bug.priority);
       assignedTo.set(bug.assigned_to_detail.name);
-      whiteboardField.set(bug.whiteboard || '');  // Set the whiteboard if available, otherwise set it to an empty string
+      whiteboardField.set(bug.whiteboard || '');
     } catch (err) {
       console.error('Failed to fetch bug details:', err);
       error = 'Failed to fetch bug details';
