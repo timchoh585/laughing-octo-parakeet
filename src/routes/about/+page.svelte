@@ -57,6 +57,6 @@
     I'm still learning how to optimize efficiently, so it could be a while.
   </p>
   <p>
-    Feel free to browse (or contribute) to the <a href="https://github.com/timchoh585/laughing-octo-parakeet?tab=MPL-2.0-1-ov-file" target="_blank" rel="noopener noreferrer">codebase here!</a>
+    Feel free to browse (or contribute) to the <a href="https://github.com/timchoh585/laughing-octo-parakeet" target="_blank" rel="noopener noreferrer">codebase here!</a>
   </p>
 </div>
