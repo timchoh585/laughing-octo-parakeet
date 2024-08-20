@@ -108,16 +108,6 @@
         return progress;
     };
 
-    const fetchBugDetails = async (bugId) => {
-        try {
-            const bug = await getBug(bugId);
-            whiteboardField.set(bug.whiteboard || '');
-        } catch (err) {
-            console.error('Failed to fetch bug details:', err);
-            error.set('Failed to fetch bug details');
-        }
-    };
-
     const handleAddBug = async () => {
         const id = parseInt(get(newBugId), 10);
         if (!isNaN(id) && id > 0) {
@@ -126,6 +116,16 @@
             await submitBug();
         } else {
             alert('Please enter a valid bug ID');
+        }
+    };
+
+    const fetchBugDetails = async (bugId) => {
+        try {
+            const bug = await getBug(bugId);
+            whiteboardField.set(bug.whiteboard || '');
+        } catch (err) {
+            console.error('Failed to fetch bug details:', err);
+            error.set('Failed to fetch bug details');
         }
     };
 

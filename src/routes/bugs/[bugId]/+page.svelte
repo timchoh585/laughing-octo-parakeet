@@ -136,6 +136,21 @@
   .edit-button button:active {
     transform: translateY(0);
   }
+
+  .bugzilla-link {
+    margin-top: 1rem;
+    text-align: center;
+  }
+
+  .bugzilla-link a {
+    color: #007bff;
+    text-decoration: none;
+    font-weight: bold;
+  }
+
+  .bugzilla-link a:hover {
+    text-decoration: underline;
+  }
 </style>
 
 <div class="container">
@@ -199,6 +214,10 @@
           <tr>
             <th>Whiteboard</th>
             <td>{bugData.whiteboard}</td>
+          </tr>
+          <tr>
+            <th>Bugzilla Link</th>
+            <td><a href="https://bugzilla.mozilla.org/show_bug.cgi?id={bugId}">View on Bugzilla</a></td>
           </tr>
         </table>
       </div>
