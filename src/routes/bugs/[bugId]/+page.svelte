@@ -5,9 +5,12 @@
   import { getBug } from '../../../api/api';
   import { bugDetailsCache } from '../../../stores/bugDetailsStore';
   import { goto } from '$app/navigation';
+  import BugDetails from './BugDetails.svelte';
 
   let bugData = null;
   let error = null;
+  let selectedBug = null;
+  let selectedBugDetails = null;
 
   $: bugId = parseInt(get(page).params.bugId, 10);
 
@@ -35,6 +38,24 @@
     }
   };
 
+  const fetchBugDetails = async (bugId) => {
+    try {
+      selectedBugDetails = await getBug(bugId);
+      selectedBug = bugId;
+    } catch (err) {
+      console.error('Failed to fetch bug details:', err);
+    }
+  };
+
+  const closeBugDetails = () => {
+    selectedBug = null;
+    selectedBugDetails = null;
+  };
+
+  const handleEdit = () => {
+    goto(`/bugs/edit/${bugId}`);
+  };
+
   onMount(() => {
     const unsubscribe = bugDetailsCache.subscribe(cachedBugs => {
       fetchAndCompareBug(bugId).then(() => {
@@ -44,10 +65,6 @@
 
     return () => unsubscribe();
   });
-
-  const handleEdit = () => {
-    goto(`/bugs/edit/${bugId}`);
-  };
 </script>
 
 <style>
@@ -212,6 +229,34 @@
             <td>{bugData.product}</td>
           </tr>
           <tr>
+            <th>Depends on</th>
+            <td>
+              {#if bugData.depends_on.length > 0}
+                {#each bugData.depends_on as depId (depId)}
+                  <a href="javascript:void(0)" on:click={() => fetchBugDetails(depId)}>
+                    {depId}
+                  </a>{' '}
+                {/each}
+              {:else}
+                None
+              {/if}
+            </td>
+          </tr>
+          <tr>
+            <th>Blocks</th>
+            <td>
+              {#if bugData.blocks.length > 0}
+                {#each bugData.blocks as blockId (blockId)}
+                  <a href="javascript:void(0)" on:click={() => fetchBugDetails(blockId)}>
+                    {blockId}
+                  </a>{' '}
+                {/each}
+              {:else}
+                None
+              {/if}
+            </td>
+          </tr>
+          <tr>
             <th>Whiteboard</th>
             <td>{bugData.whiteboard}</td>
           </tr>
@@ -227,5 +272,8 @@
     </div>
   {:else}
     <p class="error">Bug details not available.</p>
+  {/if}
+  {#if selectedBug}
+    <BugDetails bugId={selectedBug} bugDetails={selectedBugDetails} onClose={closeBugDetails} />
   {/if}
 </div>

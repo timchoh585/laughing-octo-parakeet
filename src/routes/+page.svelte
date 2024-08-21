@@ -181,7 +181,7 @@
   
     <form class="search-form" on:submit|preventDefault={handleWhiteboardSearch}>
       <input type="text" bind:value={$whiteboard} placeholder="Search for bug by whiteboard" />
-      <button type="submit">Search</button>
+      <button type="submit">Search for bugs by whiteboard</button>
     </form>
 
     <button class="navigation-button" on:click={() => goto("./sprints")}>Go to Sprints</button>
