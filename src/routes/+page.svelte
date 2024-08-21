@@ -1,7 +1,7 @@
 <script>
     import { onMount } from 'svelte';
     import { writable } from 'svelte/store';
-    import { loginWithApiKey, getToken, removeToken } from '../api/api';
+    import { loginWithApiKey, getToken, removeToken, searchBugs } from '../api/api';
     import { goto } from '$app/navigation';
   
     let apiKey = writable('');
@@ -10,6 +10,7 @@
     let bugId = writable('');
     let email = writable('');
     let whiteboard = writable('');
+    let bugSearchQuery = writable('');
   
     const handleLogin = async () => {
       try {
@@ -58,6 +59,27 @@
         alert('Please enter a valid whiteboard');
       }
     };
+    
+    const handleAPISearch = async () => {
+      const query = $bugSearchQuery.trim();
+
+      if (query) {
+        try {
+          const data = await searchBugs(query);
+          const searchedBugs = data.bugs;
+
+          // Update bugs and filteredBugs with the search results
+          bugs = searchedBugs;
+          filteredBugs = searchedBugs;
+
+          error = null;
+        } catch (err) {
+          console.error('Failed to search bugs:', err);
+          error = 'An error occurred while searching bugs.';
+        }
+      }
+    };
+
   
     // Check if API key is already set
     onMount(() => {
@@ -177,6 +199,11 @@
     <form class="search-form" on:submit|preventDefault={handleEmailSearch}>
       <input type="text" bind:value={$email} placeholder="Enter Email" />
       <button type="submit">Search for bugs by email</button>
+    </form>
+  
+    <form class="search-form" on:submit|preventDefault={handleAPISearch}>
+      <input type="text" bind:value={$bugSearchQuery} placeholder="Enter Bug search name" />
+      <button type="submit">Search for bugs by name</button>
     </form>
   
     <form class="search-form" on:submit|preventDefault={handleWhiteboardSearch}>

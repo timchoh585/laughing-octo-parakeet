@@ -14,15 +14,19 @@ export let whiteboardField = writable('');
 
 let bugs = [];
 let filteredBugs = [];
-let error = null;
-let loading = false;
+let error = writable(null);
+let loading = writable(false);
 let newWhiteboard = writable('');
 let bugId = writable('');
 let appendString = writable('');
 let notification = writable('');
 let notificationType = writable(''); // success or error
-let updating = false; // To track the updating state
-$: whiteboard = $page.params.whiteboard;
+let updating = writable(false); // To track the updating state
+
+let whiteboard;
+$page.subscribe(($page) => {
+    whiteboard = $page.params.whiteboard;
+});
 
 const statusColors = {
   NEW: '#f8d7da',
@@ -40,7 +44,7 @@ const fetchBugsByWhiteboard = async (whiteboard) => {
     bugs = cachedBugs;
     filteredBugs = cachedBugs;
   } else {
-    loading = true;
+    loading.set(true);
   }
 
   try {
@@ -53,17 +57,17 @@ const fetchBugsByWhiteboard = async (whiteboard) => {
       whiteboardBugCache.update(cache => ({ ...cache, [whiteboard]: fetchedBugs }));
     }
     
-    error = null;
+    error.set(null);
   } catch (err) {
     console.error('Failed to fetch bugs:', err);
-    error = 'Failed to fetch bugs';
+    error.set('Failed to fetch bugs');
   } finally {
-    loading = false;
+    loading.set(false);
   }
 };
 
 const handleWhiteboardSearch = () => {
-  const whiteboardValue = $newWhiteboard.trim();
+  const whiteboardValue = get(newWhiteboard).trim();
   if (whiteboardValue) {
     goto(`/bugs/whiteboard/${encodeURIComponent(whiteboardValue)}`);
   } else {
@@ -79,16 +83,16 @@ const handleKeyPress = (event) => {
 
 const handleFilterChange = () => {
   filteredBugs = bugs.filter(bug => {
-    const matchesStatus = !$selectedStatus || bug.status === $selectedStatus;
-    const matchesAssignee = !$selectedAssignee || 
-      (bug.assigned_to_detail?.real_name || bug.assigned_to_detail?.email) === $selectedAssignee;
-    const matchesPriority = !$selectedPriority || bug.priority === $selectedPriority;
+    const matchesStatus = !get(selectedStatus) || bug.status === get(selectedStatus);
+    const matchesAssignee = !get(selectedAssignee) || 
+      (bug.assigned_to_detail?.real_name || bug.assigned_to_detail?.email) === get(selectedAssignee);
+    const matchesPriority = !get(selectedPriority) || bug.priority === get(selectedPriority);
     return matchesStatus && matchesAssignee && matchesPriority;
   });
 };
 
 const handleAddBug = () => {
-  const id = parseInt($bugId, 10);
+  const id = parseInt(get(bugId), 10);
   if (!isNaN(id) && id > 0) {
     goto(`/bugs/whiteboard/addbug/${id}`);
   } else {
@@ -133,7 +137,7 @@ const handleStatusClick = (status) => {
 };
 
 const updateBugsWhiteboard = async () => {
-  updating = true;
+  updating.set(true);
   try {
     const bugsToUpdate = get(selectedStatus) ? filteredBugs : bugs;
     for (const bug of bugsToUpdate) {
@@ -147,7 +151,7 @@ const updateBugsWhiteboard = async () => {
     notification.set('Failed to update bugs.');
     notificationType.set('error');
   } finally {
-    updating = false;
+    updating.set(false);
   }
 
   setTimeout(() => {
