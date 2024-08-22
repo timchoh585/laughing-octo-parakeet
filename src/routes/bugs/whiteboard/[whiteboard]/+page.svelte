@@ -46,12 +46,15 @@
       .filter(bug => bug.status !== 'RESOLVED' && bug.status !== 'VERIFIED')
       .map(bug => bug.id);
 
-    const allSelected = nonResolvedOrVerifiedBugIds.every(id => checkedBugIds.includes(id));
+    const allSelected = nonResolvedOrVerifiedBugIds.length > 0 && nonResolvedOrVerifiedBugIds.every(id => checkedBugIds.includes(id));
+
     selectNonResolvedOrVerifiedText.set(allSelected ? 'Deselect Non-Resolved/Verified' : 'Select Non-Resolved/Verified');
   }
 
-
   $: whiteboard = $page.params.whiteboard;
+  $: if (whiteboard) {
+    fetchBugsByWhiteboard(whiteboard);
+  }
 
   const statusColors = {
     NEW: '#f8d7da',
@@ -174,6 +177,19 @@
     console.log("Selected tickets after toggleSelectAll:", checkedBugIds);
   };
 
+  const flipSelectedBugs = () => {
+    const filtered = get(filteredBugs);
+    const selectedBugIds = new Set(checkedBugIds);
+
+    checkedBugIds = filtered
+      .filter(bug => !selectedBugIds.has(bug.id))
+      .map(bug => bug.id);
+
+    console.log("Selected tickets after flipSelectedBugs:", checkedBugIds);
+
+    selectAllChecked.set(checkedBugIds.length === filtered.length);
+  };
+
   const selectNonResolvedOrVerified = () => {
     const filtered = get(filteredBugs);
     const nonResolvedOrVerifiedBugs = filtered.filter(bug => bug.status !== 'RESOLVED' && bug.status !== 'VERIFIED');
@@ -189,6 +205,11 @@
     selectAllChecked.set(checkedBugIds.length === filtered.length);
 
     console.log("Selected tickets after selectNonResolvedOrVerified:", checkedBugIds);
+  };
+
+  const unselectAllBugs = () => {
+    checkedBugIds = [];
+    selectAllChecked.set(false);
   };
 
   const handleCheckboxChange = (bugId) => {
@@ -323,10 +344,10 @@
 
   <div class="search-container">
     <input type="text" bind:value={$newWhiteboard} placeholder="Search for new whiteboard" on:keypress={handleKeyPress} />
-    <button on:click={handleWhiteboardSearch}>Search</button>
+    <button on:click={handleWhiteboardSearch}>Search new whiteboard</button>
   </div>
 
-  <div class="search-container">
+  <!-- <div class="search-container">
     <select bind:value={$selectedStatus} on:change={handleFilterChange}>
       <option value="">All Statuses</option>
       <option value="NEW">NEW</option>
@@ -350,7 +371,7 @@
         {/if}
       {/each}
     </select>
-  </div>
+  </div> -->
 
 <!--   
   TODO: maybe we don't need this here
@@ -360,11 +381,24 @@
   </div> -->
   
   <div class="update-whiteboard-container">
-    <button 
-      class="selection-button" 
-      on:click={selectNonResolvedOrVerified}>
-      {$selectNonResolvedOrVerifiedText}
-    </button>
+    <div class="selection-buttons-row">
+      <button 
+        class="selection-button" 
+        on:click={selectNonResolvedOrVerified}>
+        {$selectNonResolvedOrVerifiedText}
+      </button>
+      <button
+        class="selection-button"
+        on:click={flipSelectedBugs}>
+        Flip Selection
+      </button>
+      <button
+        class="selection-button"
+        on:click={unselectAllBugs}>
+        Unselect All
+      </button>
+    </div>
+    
     <p class="selected-bugs-info">
       {#if checkedBugIds.length === 0}
         No tickets selected.
@@ -374,9 +408,13 @@
         {checkedBugIds.length} tickets selected.
       {/if}
     </p>
-    <input type="text" bind:value={$appendString} placeholder="Enter text to append to whiteboard" />
-    <button on:click={handleUpdateBugs} disabled={$updating}>Update Selected Bugs</button>
+    
+    <div class="update-input-button-row">
+      <input type="text" bind:value={$appendString} placeholder="Enter text to append to whiteboard" />
+      <button on:click={handleUpdateBugs} disabled={$updating}>Update Selected Bugs</button>
+    </div>
   </div>
+  
 
   <div class="quick-add-container">
     <h2>Quick Add Bug</h2>
@@ -387,11 +425,11 @@
     </div>
   </div>
 
-  <div class="view-toggle">
+  <!-- <div class="view-toggle">
     <button on:click={() => viewAsCards = !viewAsCards}>
       {viewAsCards ? 'Switch to Row View' : 'Switch to Card View'}
     </button>
-  </div>
+  </div> -->
 
   {#if $notification}
     <p class="notification {`notification-${$notificationType}`}" role="alert">
@@ -421,10 +459,9 @@
       {/if}
     {/each}
   </div>
+  <!-- Card View -->
     {#if viewAsCards}
-      <!-- Card View -->
-
-      <ul class="bug-list">
+      <!-- <ul class="bug-list">
         {#each $filteredBugs as bug}
           <li class="bug-item" style="--status-color: {statusColors[bug.status]}">
             <h2><a href={`/bugs/${bug.id}`}>{bug.summary}</a></h2>
@@ -452,7 +489,7 @@
             <p><strong>Product:</strong> {bug.product}</p>
           </li>
         {/each}
-      </ul>
+      </ul> -->
     {:else}
       <!-- Row View -->
   <table class="bug-table">
