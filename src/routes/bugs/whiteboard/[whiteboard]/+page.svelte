@@ -39,6 +39,18 @@
   let sortColumn = writable('');
   let sortDirection = writable('asc');
 
+  let selectNonResolvedOrVerifiedText = writable('Select Non-Resolved/Verified');
+
+  $: {
+    const nonResolvedOrVerifiedBugIds = get(filteredBugs)
+      .filter(bug => bug.status !== 'RESOLVED' && bug.status !== 'VERIFIED')
+      .map(bug => bug.id);
+
+    const allSelected = nonResolvedOrVerifiedBugIds.every(id => checkedBugIds.includes(id));
+    selectNonResolvedOrVerifiedText.set(allSelected ? 'Deselect Non-Resolved/Verified' : 'Select Non-Resolved/Verified');
+  }
+
+
   $: whiteboard = $page.params.whiteboard;
 
   const statusColors = {
@@ -159,8 +171,24 @@
 
     selectAllChecked.set(!isChecked);
 
-    // Debug log to show selected tickets
     console.log("Selected tickets after toggleSelectAll:", checkedBugIds);
+  };
+
+  const selectNonResolvedOrVerified = () => {
+    const filtered = get(filteredBugs);
+    const nonResolvedOrVerifiedBugs = filtered.filter(bug => bug.status !== 'RESOLVED' && bug.status !== 'VERIFIED');
+    const nonResolvedOrVerifiedBugIds = nonResolvedOrVerifiedBugs.map(bug => bug.id);
+    const allSelected = nonResolvedOrVerifiedBugIds.every(id => checkedBugIds.includes(id));
+
+    if (allSelected) {
+      checkedBugIds = checkedBugIds.filter(id => !nonResolvedOrVerifiedBugIds.includes(id));
+    } else {
+      checkedBugIds = [...new Set([...checkedBugIds, ...nonResolvedOrVerifiedBugIds])];
+    }
+
+    selectAllChecked.set(checkedBugIds.length === filtered.length);
+
+    console.log("Selected tickets after selectNonResolvedOrVerified:", checkedBugIds);
   };
 
   const handleCheckboxChange = (bugId) => {
@@ -170,7 +198,6 @@
       checkedBugIds = [...checkedBugIds, bugId];
     }
 
-    // Debug log to show selected tickets
     console.log("Selected tickets after handleCheckboxChange:", checkedBugIds);
   };
 
@@ -333,6 +360,11 @@
   </div> -->
   
   <div class="update-whiteboard-container">
+    <button 
+      class="selection-button" 
+      on:click={selectNonResolvedOrVerified}>
+      {$selectNonResolvedOrVerifiedText}
+    </button>
     <p class="selected-bugs-info">
       {#if checkedBugIds.length === 0}
         No tickets selected.

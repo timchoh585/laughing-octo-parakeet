@@ -358,6 +358,31 @@ h1 {
   background: #0056b3;
 }
 
+.selection-button {
+  padding: 5px 10px;
+  border: 1px solid #ccc;
+  background-color: #f0f0f0;
+  color: #333;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+  font-size: 0.875rem;
+  border-radius: 4px;
+}
+
+.selection-button.active {
+  background-color: #4caf50;
+  color: #fff;
+  border-color: #4caf50;
+}
+
+.selection-button:hover {
+  background-color: #ddd;
+}
+
+.selection-button.active:hover {
+  background-color: #45a049;
+}
+
 /* Row View Styles */
 .bug-table {
   width: 100%;
