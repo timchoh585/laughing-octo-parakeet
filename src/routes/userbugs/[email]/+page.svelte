@@ -5,7 +5,7 @@
     import { getAssignedBugsByEmail, getFlaggedBugsByEmail, getRecentCommentedBugsByEmail, getRecentlyClosedBugsByEmail } from '../../../api/api';
     import { assignedBugsCache, flaggedBugsCache, commentedBugsCache, closedBugsCache } from '../../../stores/bugStore';
     import { writable } from 'svelte/store';
-    import './styles.css';
+    import '../../../styles/styles.css';
   
     let assignedBugs = [];
     let flaggedBugs = [];
