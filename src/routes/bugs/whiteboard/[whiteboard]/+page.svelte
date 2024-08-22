@@ -150,12 +150,17 @@
   const toggleSelectAll = () => {
     const isChecked = get(selectAllChecked);
     const filtered = get(filteredBugs);
-    
+
     if (isChecked) {
-      checkedBugIds = filtered.map(bug => bug.id);
-    } else {
       checkedBugIds = [];
+    } else {
+      checkedBugIds = filtered.map(bug => bug.id);
     }
+
+    selectAllChecked.set(!isChecked);
+
+    // Debug log to show selected tickets
+    console.log("Selected tickets after toggleSelectAll:", checkedBugIds);
   };
 
   const handleCheckboxChange = (bugId) => {
@@ -165,8 +170,8 @@
       checkedBugIds = [...checkedBugIds, bugId];
     }
 
-    const filtered = get(filteredBugs);
-    selectAllChecked.set(checkedBugIds.length === filtered.length);
+    // Debug log to show selected tickets
+    console.log("Selected tickets after handleCheckboxChange:", checkedBugIds);
   };
 
   const handleUpdateBugs = () => {
@@ -422,7 +427,13 @@
     <thead>
       <tr>
         <th>
-          <input type="checkbox" bind:checked={$selectAllChecked} on:change={toggleSelectAll} />
+          Bulk Edit
+          <p></p>
+          <button
+            class="selection-button {$selectAllChecked ? 'active' : ''}"
+            on:click={toggleSelectAll}>
+            {$selectAllChecked ? 'Deselect All' : 'Select All'}
+          </button>
         </th>
         <th class="sortable" on:click={() => sortBugs('id')}>
           ID
@@ -465,18 +476,16 @@
     <tbody>
       {#each $filteredBugs as bug}
         <tr>
-          <td>
-            <input 
-            type="checkbox" 
-            checked={checkedBugIds.includes(bug.id)} 
-            on:change={() => handleCheckboxChange(bug.id)} 
-          />
+          <td on:click={() => handleCheckboxChange(bug.id)}>
+            <button class="selection-button {checkedBugIds.includes(bug.id) ? 'active' : ''}">
+              {checkedBugIds.includes(bug.id) ? 'Deselect' : 'Select'}
+            </button>
           </td>
           <td><a href={`/bugs/${bug.id}`}>{bug.id}</a></td>
           <td>
-            <img 
-              src={typeIcons[bug.type.toLowerCase()]} 
-              alt={bug.type} 
+            <img
+              src={typeIcons[bug.type.toLowerCase()]}
+              alt={bug.type}
               class="type-icon"
             />
           </td>          

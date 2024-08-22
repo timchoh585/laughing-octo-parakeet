@@ -397,12 +397,35 @@ h1 {
   text-decoration: underline;
 }
 
-/* Add spacing between rows */
 .bug-table tr + tr {
   margin-top: 10px;
 }
 
-/* View toggle button */
+.selection-button {
+  padding: 5px 10px;
+  border: 1px solid #ccc;
+  background-color: #f0f0f0;
+  color: #333;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+  font-size: 0.875rem;
+  border-radius: 4px;
+}
+
+.selection-button.active {
+  background-color: #4caf50;
+  color: #fff;
+  border-color: #4caf50;
+}
+
+.selection-button:hover {
+  background-color: #ddd;
+}
+
+.selection-button.active:hover {
+  background-color: #45a049;
+}
+
 .view-toggle {
   text-align: center;
   margin-bottom: 1rem;
@@ -433,139 +456,10 @@ h1 {
   margin-left: 4px;
 }
 
-.bug-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 1rem;
-}
-
-.bug-table th,
-.bug-table td {
-  padding: 12px 15px;
-  border: 1px solid #ddd;
-  text-align: left;
-}
-
-.bug-table th {
-  background-color: #f4f4f4;
-  cursor: pointer;
-  font-weight: bold;
-  position: sticky;
-  top: 0;
-  z-index: 1;
-}
-
-.bug-table th.sortable {
-  background-color: #f4f4f4;
-  position: relative;
-}
-
-.bug-table th.sortable span {
-  margin-left: 8px;
-  font-size: 0.8rem;
-}
-
-.bug-table tbody tr {
-  transition: background-color 0.3s ease;
-}
-
-.bug-table tbody tr:nth-child(even) {
-  background-color: #f9f9f9;
-}
-
-.bug-table tbody tr:hover {
-  background-color: #e9e9e9;
-}
-
-.bug-table tbody td a {
-  color: #007BFF;
-  text-decoration: none;
-}
-
-.bug-table tbody td a:hover {
-  text-decoration: underline;
-}
-
 .no-bugs {
   font-style: italic;
   color: #555;
   margin-top: 2rem;
-  text-align: center;
-}
-
-.notification {
-  margin: 1rem 0;
-  padding: 1rem;
-  border-radius: 5px;
-}
-
-.notification-success {
-  background-color: #d4edda;
-  color: #155724;
-}
-
-.notification-error {
-  background-color: #f8d7da;
-  color: #721c24;
-}
-
-.bug-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 1rem;
-}
-
-.bug-table th,
-.bug-table td {
-  padding: 12px 15px;
-  border: 1px solid #ddd;
-  text-align: left;
-}
-
-.bug-table th {
-  background-color: #f4f4f4;
-  cursor: pointer;
-  font-weight: bold;
-  position: sticky;
-  top: 0;
-  z-index: 1;
-}
-
-.bug-table th.sortable {
-  background-color: #f4f4f4;
-  position: relative;
-}
-
-.bug-table th.sortable span {
-  margin-left: 8px;
-  font-size: 0.8rem;
-}
-
-.bug-table tbody tr {
-  transition: background-color 0.3s ease;
-}
-
-.bug-table tbody tr:nth-child(even) {
-  background-color: #f9f9f9;
-}
-
-.bug-table tbody tr:hover {
-  background-color: #e9e9e9;
-}
-
-.bug-table tbody td a {
-  color: #007BFF;
-  text-decoration: none;
-}
-
-.bug-table tbody td a:hover {
-  text-decoration: underline;
-}
-
-.bug-table tbody td.status-cell {
-  background-color: var(--status-color);
-  color: #fff;
-  font-weight: bold;
   text-align: center;
 }
 
@@ -574,165 +468,6 @@ h1 {
   color: #555;
   margin-top: 2rem;
   text-align: center;
-}
-
-.notification {
-  margin: 1rem 0;
-  padding: 1rem;
-  border-radius: 5px;
-}
-
-.notification-success {
-  background-color: #d4edda;
-  color: #155724;
-}
-
-.notification-error {
-  background-color: #f8d7da;
-  color: #721c24;
-}
-
-.bug-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 1rem;
-}
-
-.bug-table th,
-.bug-table td {
-  padding: 12px 15px;
-  border: 1px solid #ddd;
-  text-align: left;
-}
-
-.bug-table th {
-  background-color: #f4f4f4;
-  cursor: pointer;
-  font-weight: bold;
-  position: sticky;
-  top: 0;
-  z-index: 1;
-}
-
-.bug-table th.sortable {
-  background-color: #f4f4f4;
-  position: relative;
-}
-
-.bug-table th.sortable span {
-  margin-left: 8px;
-  font-size: 0.8rem;
-}
-
-.bug-table tbody tr {
-  transition: background-color 0.3s ease;
-}
-
-.bug-table tbody tr:nth-child(even) {
-  background-color: #f9f9f9;
-}
-
-.bug-table tbody tr:hover {
-  background-color: #e9e9e9;
-}
-
-.bug-table tbody td a {
-  color: #007BFF;
-  text-decoration: none;
-}
-
-.bug-table tbody td a:hover {
-  text-decoration: underline;
-}
-
-.bug-table tbody td.status-cell {
-  background-color: var(--status-color);
-  color: var(--status-text-color);
-  font-weight: bold;
-  text-align: center;
-}
-
-.bug-table tbody td.status-cell {
-  --status-text-color: rgb(
-    calc(255 - (var(--status-color-r, 0))),
-    calc(255 - (var(--status-color-g, 0))),
-    calc(255 - (var(--status-color-b, 0)))
-  );
-}
-
-.no-bugs {
-  font-style: italic;
-  color: #555;
-  margin-top: 2rem;
-  text-align: center;
-}
-
-.notification {
-  margin: 1rem 0;
-  padding: 1rem;
-  border-radius: 5px;
-}
-
-.notification-success {
-  background-color: #d4edda;
-  color: #155724;
-}
-
-.notification-error {
-  background-color: #f8d7da;
-  color: #721c24;
-}
-
-.bug-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 1rem;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.bug-table th, .bug-table td {
-  padding: 15px 20px;
-  border: 1px solid #ddd;
-  text-align: left;
-  vertical-align: middle;
-}
-
-.bug-table th {
-  background-color: #f0f0f0;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  position: sticky;
-  top: 0;
-  z-index: 1;
-}
-
-.bug-table tbody tr {
-  transition: background-color 0.3s ease;
-}
-
-.bug-table tbody tr:nth-child(even) {
-  background-color: #f9f9f9;
-}
-
-.bug-table tbody tr:hover {
-  background-color: #e9e9e9;
-  cursor: pointer;
-}
-
-.bug-table tbody td a {
-  color: #007bff;
-  text-decoration: none;
-}
-
-.bug-table tbody td a:hover {
-  text-decoration: underline;
-}
-
-.bug-table tbody td.status-cell {
-  border-radius: 4px;
 }
 
 .type-icon {
