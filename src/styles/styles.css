@@ -456,10 +456,10 @@ h1 {
   margin-left: 4px;
 }
 
-.no-bugs {
-  font-style: italic;
-  color: #555;
-  margin-top: 2rem;
+.bug-table tbody td.status-cell {
+  background-color: var(--status-color);
+  color: var(--status-text-color);
+  font-weight: bold;
   text-align: center;
 }
 
@@ -468,6 +468,74 @@ h1 {
   color: #555;
   margin-top: 2rem;
   text-align: center;
+}
+
+.notification {
+  margin: 1rem 0;
+  padding: 1rem;
+  border-radius: 5px;
+}
+
+.notification-success {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.notification-error {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.bug-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.bug-table th, .bug-table td {
+  padding: 15px 20px;
+  border: 1px solid #ddd;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.bug-table th {
+  background-color: #f0f0f0;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.bug-table tbody tr {
+  transition: background-color 0.3s ease;
+}
+
+.bug-table tbody tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+.bug-table tbody tr:hover {
+  background-color: #e9e9e9;
+  cursor: pointer;
+}
+
+.bug-table tbody td a {
+  color: #007bff;
+  text-decoration: none;
+}
+
+.bug-table tbody td a:hover {
+  text-decoration: underline;
+}
+
+.bug-table tbody td.status-cell {
+  border-radius: 4px;
 }
 
 .type-icon {
