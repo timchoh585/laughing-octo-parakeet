@@ -5,8 +5,16 @@
   import { searchWhiteboard, getBug, updateBug } from '../../../../api/api';
   import { writable, get } from 'svelte/store';
   import { whiteboardBugCache } from '../../../../stores/bugStore';
+  import defectIcon from '../../../../resources/img/icons/defect.svg';
+  import enhancementIcon from '../../../../resources/img/icons/enhancement.svg';
+  import taskIcon from '../../../../resources/img/icons/task.svg';
 
-  // Writable stores
+  const typeIcons = {
+    defect: defectIcon,
+    enhancement: enhancementIcon,
+    task: taskIcon,
+  };
+
   let selectedStatus = writable('');
   let selectedAssignee = writable('');
   let selectedPriority = writable('');
@@ -17,19 +25,20 @@
   let bugId = writable('');
   let appendString = writable('');
   let notification = writable('');
-  let notificationType = writable(''); // success or error
-  let updating = writable(false); // To track the updating state
+  let notificationType = writable('');
+  let updating = writable(false);
   let error = writable(null);
   let loading = writable(false);
-  let filteredBugs = writable([]); // Now a store
+  let filteredBugs = writable([]);
+  let selectAllChecked = writable(false);
 
   let bugs = [];
-  let viewAsCards = false;  // Initialize viewAsCards variable
+  let viewAsCards = false;
+  let checkedBugIds = [];
 
   let sortColumn = writable('');
-  let sortDirection = writable('asc'); // 'asc' or 'desc'
+  let sortDirection = writable('asc');
 
-  // Reactive statement to get the whiteboard parameter
   $: whiteboard = $page.params.whiteboard;
 
   const statusColors = {
@@ -46,7 +55,7 @@
 
     if (cachedBugs) {
       bugs = cachedBugs;
-      filteredBugs.set(cachedBugs); // Update the store
+      filteredBugs.set(cachedBugs);
     } else {
       loading.set(true);
     }
@@ -57,7 +66,7 @@
 
       if (JSON.stringify(cachedBugs) !== JSON.stringify(fetchedBugs)) {
         bugs = fetchedBugs;
-        filteredBugs.set(fetchedBugs); // Update the store
+        filteredBugs.set(fetchedBugs);
         whiteboardBugCache.update(cache => ({ ...cache, [whiteboard]: fetchedBugs }));
       }
       
@@ -93,7 +102,7 @@
       const matchesPriority = !get(selectedPriority) || bug.priority === get(selectedPriority);
       return matchesStatus && matchesAssignee && matchesPriority;
     });
-    filteredBugs.set(filtered); // Update the store with the filtered bugs
+    filteredBugs.set(filtered);
   };
 
   const handleAddBug = () => {
@@ -126,19 +135,51 @@
   const handleStatusClick = (status) => {
     if (get(selectedStatus) === status) {
       if (previousStatus === status) {
-        // Second click, reset the filter
         selectedStatus.set('');
         previousStatus = '';
       } else {
-        // First click, apply the filter
         previousStatus = status;
       }
     } else {
-      // Different filter clicked, apply the filter
       selectedStatus.set(status);
       previousStatus = status;
     }
-    handleFilterChange(); // Reapply the filter logic
+    handleFilterChange();
+  };
+
+  const toggleSelectAll = () => {
+    const isChecked = get(selectAllChecked);
+    const filtered = get(filteredBugs);
+    
+    if (isChecked) {
+      checkedBugIds = filtered.map(bug => bug.id);
+    } else {
+      checkedBugIds = [];
+    }
+  };
+
+  const handleCheckboxChange = (bugId) => {
+    if (checkedBugIds.includes(bugId)) {
+      checkedBugIds = checkedBugIds.filter(id => id !== bugId);
+    } else {
+      checkedBugIds = [...checkedBugIds, bugId];
+    }
+
+    const filtered = get(filteredBugs);
+    selectAllChecked.set(checkedBugIds.length === filtered.length);
+  };
+
+  const handleUpdateBugs = () => {
+    if (checkedBugIds.length === 0) {
+      alert("Please select at least one bug to update.");
+      return;
+    }
+    if (!get(appendString).trim()) {
+      alert("Please enter text to append to the whiteboard.");
+      return;
+    }
+
+    updateBugsWhiteboard();
   };
 
   const updateBugsWhiteboard = async () => {
@@ -203,16 +244,14 @@
   });
 
   const sortIcons = {
-    asc: '▲',  // Up arrow for ascending
-    desc: '▼'  // Down arrow for descending
+    asc: '▲',
+    desc: '▼'
   };
 
   const sortBugs = (column) => {
     if (get(sortColumn) === column) {
-      // Toggle sort direction
       sortDirection.set(get(sortDirection) === 'asc' ? 'desc' : 'asc');
     } else {
-      // Set new sort column and reset direction to ascending
       sortColumn.set(column);
       sortDirection.set('asc');
     }
@@ -221,11 +260,9 @@
       let aValue, bValue;
 
       if (column === 'assigned_to_detail') {
-        // Sort by real_name first, then by email if real_name is not available
         aValue = a.assigned_to_detail?.real_name?.toLowerCase() || a.assigned_to_detail?.email?.toLowerCase() || '';
         bValue = b.assigned_to_detail?.real_name?.toLowerCase() || b.assigned_to_detail?.email?.toLowerCase() || '';
       } else {
-        // For other columns, sort normally
         aValue = a[column];
         bValue = b[column];
 
@@ -243,7 +280,7 @@
 
 </script>
 
-<style src="./styles.css"></style>
+<style src="../../../../styles/styles.css"></style>
 
 <div class="container {$updating ? 'disabled' : ''}">
   {#if $error}
@@ -253,7 +290,7 @@
   <h1>Bug List for Whiteboard: {whiteboard}</h1>
 
   <div class="search-container">
-    <input type="text" bind:value={$newWhiteboard} placeholder="Search for bug by whiteboard" on:keypress={handleKeyPress} />
+    <input type="text" bind:value={$newWhiteboard} placeholder="Search for new whiteboard" on:keypress={handleKeyPress} />
     <button on:click={handleWhiteboardSearch}>Search</button>
   </div>
 
@@ -283,9 +320,25 @@
     </select>
   </div>
 
+<!--   
+  TODO: maybe we don't need this here
   <div class="search-container">
-    <input type="text" bind:value={$bugId} placeholder="Enter Bug ID to add" />
+    <input type="text" bind:value={$bugId} placeholder="Enter Bug ID to edit" />
     <button on:click={handleAddBug}>Add a New Ticket</button>
+  </div> -->
+  
+  <div class="update-whiteboard-container">
+    <p class="selected-bugs-info">
+      {#if checkedBugIds.length === 0}
+        No tickets selected.
+      {:else if checkedBugIds.length === 1}
+        1 ticket selected.
+      {:else}
+        {checkedBugIds.length} tickets selected.
+      {/if}
+    </p>
+    <input type="text" bind:value={$appendString} placeholder="Enter text to append to whiteboard" />
+    <button on:click={handleUpdateBugs} disabled={$updating}>Update Selected Bugs</button>
   </div>
 
   <div class="quick-add-container">
@@ -368,6 +421,9 @@
   <table class="bug-table">
     <thead>
       <tr>
+        <th>
+          <input type="checkbox" bind:checked={$selectAllChecked} on:change={toggleSelectAll} />
+        </th>
         <th class="sortable" on:click={() => sortBugs('id')}>
           ID
           {#if $sortColumn === 'id'}
@@ -409,8 +465,21 @@
     <tbody>
       {#each $filteredBugs as bug}
         <tr>
+          <td>
+            <input 
+            type="checkbox" 
+            checked={checkedBugIds.includes(bug.id)} 
+            on:change={() => handleCheckboxChange(bug.id)} 
+          />
+          </td>
           <td><a href={`/bugs/${bug.id}`}>{bug.id}</a></td>
-          <td>{bug.type}</td>
+          <td>
+            <img 
+              src={typeIcons[bug.type.toLowerCase()]} 
+              alt={bug.type} 
+              class="type-icon"
+            />
+          </td>          
           <td>{bug.summary}</td>
           <td>{bug.assigned_to_detail?.real_name || bug.assigned_to_detail?.email}</td>
           <td 

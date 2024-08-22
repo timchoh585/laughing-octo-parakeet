@@ -269,7 +269,8 @@ export async function searchBugs(query: string): Promise<any> {
 // Search for bugs based on a query
 export async function searchWhiteboard(query: string): Promise<any> {
   query = validateQuery(query);
-  const response = await fetch(`${API_BASE_URL}/bug?whiteboard=${encodeURIComponent(query)}`);
+  const response = await fetch(`${API_BASE_URL}/bug?whiteboard=${encodeURIComponent(query)}&` +
+  `include_fields=id,type,summary,status,resolution,assigned_to`);
   if (!response.ok) {
     throw new Error('Network response was not ok');
   }
