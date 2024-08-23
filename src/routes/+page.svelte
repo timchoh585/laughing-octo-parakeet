@@ -110,7 +110,7 @@
     {/if}
   
     <p></p>
-    <button class="navigation-button" on:click={() => goto("./products")}>Go to Products Page</button>
+    <!-- <button class="navigation-button" on:click={() => goto("./products")}>Go to Products Page</button> -->
     <p></p>
   
     <form class="search-form" on:submit|preventDefault={handleBugSearch}>
@@ -123,16 +123,16 @@
       <button type="submit">Search for bugs by email</button>
     </form>
   
-    <form class="search-form" on:submit|preventDefault={handleAPISearch}>
+    <!-- <form class="search-form" on:submit|preventDefault={handleAPISearch}>
       <input type="text" bind:value={$bugSearchQuery} placeholder="Enter Bug search name" />
       <button type="submit">Search for bugs by name</button>
-    </form>
+    </form> -->
   
     <form class="search-form" on:submit|preventDefault={handleWhiteboardSearch}>
       <input type="text" bind:value={$whiteboard} placeholder="Search for bug by whiteboard" />
       <button type="submit">Search for bugs by whiteboard</button>
     </form>
 
-    <button class="navigation-button" on:click={() => goto("./sprints")}>Go to Sprints</button>
+    <button class="navigation-button" on:click={() => goto("./teams")}>Go to Sprints</button>
   </div>
   
