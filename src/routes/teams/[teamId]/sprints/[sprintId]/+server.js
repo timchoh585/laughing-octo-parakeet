@@ -10,11 +10,11 @@ export async function GET({ params }) {
         const sprintDoc = await db.collection('teams').doc(teamId).collection('sprints').doc(sprintId).get();
 
         if (!sprintDoc.exists) {
-            console.log('Sprint document does not exist');  // Debugging line
+            console.log('Sprint document does not exist');
             throw error(404, 'Sprint not found');
         }
 
-        console.log('Sprint data found:', sprintDoc.data());  // Debugging line
+        console.log('Sprint data found:', sprintDoc.data());
         return json(sprintDoc.data());
     } catch (err) {
         console.error('Error fetching sprint:', err);
@@ -22,7 +22,6 @@ export async function GET({ params }) {
     }
 }
 
-// Add a bug to a sprint
 export async function POST({ request, params }) {
     const { teamId, sprintId } = params;
 

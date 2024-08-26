@@ -213,6 +213,27 @@ export async function getBug(bugId: number): Promise<any> {
   return data.bugs[0];  // Assuming the API returns an array of bugs
 }
 
+// Function to fetch details for multiple bugs based on a list of bug IDs
+export async function getBugsDetails(bugIdsString: string): Promise<any[]> {
+  try {
+    // Split the comma-separated string into an array of bug IDs
+    const bugIds = bugIdsString.split(',').map(id => parseInt(id.trim(), 10));
+
+    // Fetch details for each bug
+    const bugDetailsPromises = bugIds.map(bugId => getBug(bugId));
+
+    // Wait for all the promises to resolve
+    const bugDetails = await Promise.all(bugDetailsPromises);
+
+    console.log('Fetched bug details:', bugDetails);
+
+    return bugDetails;
+  } catch (error) {
+    console.error('Failed to fetch bug details:', error);
+    throw error;
+  }
+}
+
 // Function to fetch bugs for a specific product and component
 export async function getBugs(productName: string, componentName: string): Promise<any> {
   const response = await fetch(`${API_BASE_URL}/bug?
@@ -270,7 +291,7 @@ export async function searchBugs(query: string): Promise<any> {
 export async function searchWhiteboard(query: string): Promise<any> {
   query = validateQuery(query);
   const response = await fetch(`${API_BASE_URL}/bug?whiteboard=${encodeURIComponent(query)}&` +
-  `include_fields=id,type,summary,status,resolution,assigned_to`);
+  `include_fields=id,type,summary,status,resolution,assigned_to,product,component,priority`);
   if (!response.ok) {
     throw new Error('Network response was not ok');
   }

@@ -1,10 +1,10 @@
 <script>
     import { onMount } from 'svelte';
     import { page } from '$app/stores';
-    import { goto } from '$app/navigation';
-    import { searchWhiteboard, getBug, updateBug } from '../../../../../api/api';  
     import { writable, get } from 'svelte/store';
-    import { whiteboardBugCache } from '../../../../../stores/bugStore';  
+    import { goto } from '$app/navigation';
+    import { searchWhiteboard, getBug, getBugsDetails, updateBug } from '../../../../../api/api';
+    import { whiteboardBugCache } from '../../../../../stores/bugStore';
     import defectIcon from '../../../../../resources/img/icons/defect.svg';
     import enhancementIcon from '../../../../../resources/img/icons/enhancement.svg';
     import taskIcon from '../../../../../resources/img/icons/task.svg';
@@ -28,6 +28,7 @@
     let loading = writable(false);
     let filteredBugs = writable([]);
     let selectAllChecked = writable(false);
+    let sprintBugs = writable([]);
   
     let bugs = [];
     let checkedBugIds = [];
@@ -35,6 +36,9 @@
     let sortDirection = writable('asc');
     let sprintName = writable('');
     let quickAddSprintName = writable('');
+  
+    let teamId;
+    let sprintId;
   
     let selectNonResolvedOrVerifiedText = writable('Select Non-Resolved/Verified');
   
@@ -58,45 +62,46 @@
     const statusList = ['NEW', 'ASSIGNED', 'RESOLVED', 'VERIFIED'];
   
     const fetchSprintName = async (teamId, sprintId) => {
-        try {
-            console.log(`Fetching sprint data for teamId: ${teamId}, sprintId: ${sprintId}`);
-            const response = await fetch(`/teams/${teamId}/sprints/${sprintId}`);
-            
-            if (!response.ok) {
-                throw new Error('Failed to fetch sprint data');
-            }
-            
-            const sprintData = await response.json();
-            sprintName.set(sprintData.name);
-            quickAddSprintName.set("[" + sprintData.name + "]");
-            fetchBugsBySprintName(sprintData.name);
-        } catch (err) {
-            console.error('Failed to fetch sprint name:', err);
-            error.set('Failed to fetch sprint name');
-        }
-    };
-
-    const fetchBugsBySprintName = async (sprintName) => {
-      const cachedBugs = get(whiteboardBugCache)[sprintName];
-  
-      if (cachedBugs) {
-        bugs = cachedBugs;
-        filteredBugs.set(cachedBugs);
-      } else {
-        loading.set(true);
-      }
-  
       try {
-        const data = await searchWhiteboard(sprintName);  // Fetch using the sprint name as whiteboard
-        const fetchedBugs = data.bugs;
-  
-        if (JSON.stringify(cachedBugs) !== JSON.stringify(fetchedBugs)) {
-          bugs = fetchedBugs;
-          filteredBugs.set(fetchedBugs);
-          whiteboardBugCache.update(cache => ({ ...cache, [sprintName]: fetchedBugs }));
+        console.log(`Fetching sprint data for teamId: ${teamId}, sprintId: ${sprintId}`);
+        const response = await fetch(`/teams/${teamId}/sprints/${sprintId}`);
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch sprint data');
         }
         
+        const sprintData = await response.json();
+        sprintName.set(sprintData.name);
+        quickAddSprintName.set("[" + sprintData.name + "]");
+        fetchBugsByWhiteboard(sprintData.name);
+      } catch (err) {
+        console.error('Failed to fetch sprint name:', err);
+        error.set('Failed to fetch sprint name');
+      }
+    };
+  
+    const fetchBugsByWhiteboard = async (sprintName) => {
+    //   const cachedBugs = get(whiteboardBugCache)[sprintName];
+  
+    //   if (cachedBugs) {
+    //     bugs = cachedBugs;
+    //     filteredBugs.set(cachedBugs);
+    //   } else {
+    //     loading.set(true);
+    //   }
+  
+      try {
+        const data = await searchWhiteboard(sprintName);
+        const fetchedBugs = data.bugs;
+  
+        // if (JSON.stringify(cachedBugs) !== JSON.stringify(fetchedBugs)) {
+        //   bugs = fetchedBugs;
+        //   filteredBugs.set(fetchedBugs);
+        //   whiteboardBugCache.update(cache => ({ ...cache, [sprintName]: fetchedBugs }));
+        // }
+        
         error.set(null);
+        addBugsToSprint(fetchedBugs.map(bug => bug.id));
       } catch (err) {
         console.error('Failed to fetch bugs:', err);
         error.set('Failed to fetch bugs');
@@ -105,58 +110,129 @@
       }
     };
   
+    const addBugsToSprint = async (bugIds) => {
+        if (!bugIds.length) {
+            alert('No bugs found to add to the sprint');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/teams/${teamId}/sprints/${sprintId}/addbugs`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ bugIds }),
+            });
+
+            if (!response.ok) {
+                const errorResponse = await response.json();
+                console.error('Failed to add bugs to the sprint:', errorResponse);
+                alert(`Failed to add bugs to the sprint: ${errorResponse.message}`);
+            }
+
+            const result = await response.json();
+            notification.set('Bugs were successfully added to the sprint.');
+            notificationType.set('success');
+
+            fetchBugIds(teamId, sprintId);
+        } catch (err) {
+            console.error('Error in addBugsToSprint:', err);
+            notification.set('Failed to add bugs to the sprint.');
+            notificationType.set('error');
+        }
+
+        setTimeout(() => {
+            notification.set('');
+        }, 5000);
+    };
+
+    const fetchBugIds = async (teamId, sprintId) => {
+        try {
+            const response = await fetch(`/teams/${teamId}/sprints/${sprintId}/bugs`);
+            if (!response.ok) {
+            throw new Error('Failed to fetch bug IDs');
+            }
+            const data = await response.json();
+            fetchAllBugDetails(data.bugIds);
+        } catch (err) {
+            console.error('Error fetching bug IDs:', err);
+        }
+    };
+
     const handleFilterChange = () => {
       const filtered = bugs.filter(bug => {
         const matchesStatus = !get(selectedStatus) || bug.status === get(selectedStatus);
-        const matchesAssignee = !get(selectedAssignee) || 
+        const matchesAssignee = !get(selectedAssignee) ||
           (bug.assigned_to_detail?.real_name || bug.assigned_to_detail?.email) === get(selectedAssignee);
         const matchesPriority = !get(selectedPriority) || bug.priority === get(selectedPriority);
         return matchesStatus && matchesAssignee && matchesPriority;
       });
       filteredBugs.set(filtered);
     };
-  
-    const handleAddBug = () => {
-      const id = parseInt(get(newBugId), 10);
-      if (!isNaN(id) && id > 0) {
-        goto(`/teams/${$page.params.teamId}/sprints/${sprintId}/addbug/${id}`);
-      } else {
-        alert('Please enter a valid bug ID');
-      }
-    };
 
     const quickAddBug = async () => {
-    const id = parseInt(get(newBugId), 10);
-    if (!isNaN(id) && id > 0) {
-      await fetchBugDetails(id);
-      await submitBug();
-    } else {
-      alert('Please enter a valid bug ID');
-    }
-  };
+        const id = parseInt(get(newBugId), 10);
+        if (!isNaN(id) && id > 0) {
+            try {
+            await addBugToSprintCollection(id);
+            } catch (error) {
+            console.error('Failed to add bug:', error);
+            }
+        } else {
+            error.set('Please enter a valid bug ID');
+        }
+    };
 
-  const fetchBugDetails = async (bugId) => {
-    try {
-      const bug = await getBug(bugId);
-      whiteboardField.set(bug.whiteboard || '');
-    } catch (err) {
-      console.error('Failed to fetch bug details:', err);
-      error.set('Failed to fetch bug details');
-    }
-  };
+    const addBugToSprintCollection = async (bugId) => {
+        const teamId = $page.params.teamId;
+        const sprintId = $page.params.sprintId;
 
-  const submitBug = async () => {
-    try {
-      const updatedBugData = {
-        whiteboard: get(whiteboardField) + get(sprintName)
-      };
-      await updateBug(get(newBugId), updatedBugData);
-      fetchBugsByWhiteboard(get(sprintName));
-    } catch (err) {
-      console.error('Failed to update bug:', err);
-      alert('Please enter a valid bug ID');
+        if (!teamId || !sprintId) {
+            throw new Error('teamId or sprintId is missing');
+        }
+
+        try {
+            const response = await fetch(`/teams/${teamId}/sprints/${sprintId}/addbugs`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            // Wrap bugId in an array
+            body: JSON.stringify({ bugIds: [bugId] }),
+            });
+
+            if (!response.ok) {
+            const errorResponse = await response.json();
+            console.error('Failed to add bugs to the sprint:', errorResponse);
+            throw new Error('Failed to add bugs to the sprint.');
+            }
+
+            const result = await response.json();
+            notification.set('Bugs were successfully added to the sprint.');
+            notificationType.set('success');
+
+            fetchBugIds(teamId, sprintId);
+        } catch (err) {
+            console.error('Error in addBugToSprintCollection:', err);
+            notification.set('Failed to add bugs to the sprint.');
+            notificationType.set('error');
+        }
+    };
+
+
+    const fetchAllBugDetails = async(bugIds) => {
+        try {
+            const fetchedBugs = await getBugsDetails(bugIds);
+
+            bugs = fetchedBugs;
+            filteredBugs.set(fetchedBugs);
+            error.set(null);
+        } catch (err) {
+            console.error('Failed to fetch bug list details:', err);
+            error.set('Failed to fetch bug list details');
+        }
     }
-  };
   
     const handleStatusClick = (status) => {
       if (get(selectedStatus) === status) {
@@ -227,69 +303,31 @@
       console.log("Selected tickets after handleCheckboxChange:", checkedBugIds);
     };
   
-    const handleUpdateBugs = () => {
-      if (checkedBugIds.length === 0) {
-        alert("Please select at least one bug to update.");
-        return;
-      }
-      if (!get(appendString).trim()) {
-        alert("Please enter text to append to the whiteboard.");
-        return;
-      }
-  
-      updateBugsWhiteboard();
-    };
-
     const calculateStatusTotals = () => {
-    const totals = statusList.reduce((acc, status) => {
-        acc[status] = bugs.filter(bug => bug.status === status).length;
-        return acc;
-    }, {});
-
-    const totalBugs = bugs.length;
-    const progress = statusList.map(status => ({
-        status,
-        count: totals[status],
-        percentage: totalBugs > 0 ? (totals[status] / totalBugs) * 100 : 0
-    }));
-
-    return progress;
-};
+      const totals = statusList.reduce((acc, status) => {
+          acc[status] = bugs.filter(bug => bug.status === status).length;
+          return acc;
+      }, {});
   
-    const updateBugsWhiteboard = async () => {
-      updating.set(true);
-      try {
-        for (const bugId of checkedBugIds) {
-          const updatedWhiteboard = `${get(whiteboardField)} ${get(appendString)}`.trim();
-          await updateBug(bugId, { whiteboard: updatedWhiteboard });
-        }
-        notification.set('The tickets were updated successfully.');
-        notificationType.set('success');
-      } catch (err) {
-        console.error('Failed to update bugs:', err);
-        notification.set('Failed to update bugs.');
-        notificationType.set('error');
-      } finally {
-        updating.set(false);
-      }
+      const totalBugs = bugs.length;
+      const progress = statusList.map(status => ({
+          status,
+          count: totals[status],
+          percentage: totalBugs > 0 ? (totals[status] / totalBugs) * 100 : 0
+      }));
   
-      setTimeout(() => {
-        notification.set('');
-      }, 5000);
+      return progress;
     };
   
-    let teamId;
-    let sprintId;
-
     onMount(() => {
-        teamId = $page.params.teamId;
-        sprintId = $page.params.sprintId;
-
-        if (teamId && sprintId) {
-            fetchSprintName(teamId, sprintId);
-        } else {
-            console.error('Missing teamId or sprintId');
-        }
+      teamId = $page.params.teamId;
+      sprintId = $page.params.sprintId;
+  
+      if (teamId && sprintId) {
+        fetchSprintName(teamId, sprintId);
+      } else {
+        console.error('Missing teamId or sprintId');
+      }
     });
   
     const sortIcons = {
@@ -326,7 +364,6 @@
   
       filteredBugs.set(sorted);
     };
-  
   </script>
   
   <style src="../../../../../styles/styles.css"></style>
@@ -367,18 +404,17 @@
         {/if}
       </p>
       
-      <div class="update-input-button-row">
+      <!-- <div class="update-input-button-row">
         <input type="text" bind:value={$appendString} placeholder="Enter text to append to whiteboard" />
         <button on:click={handleUpdateBugs} disabled={$updating}>Update Selected Bugs</button>
-      </div>
+      </div> -->
     </div>
-    
   
     <div class="quick-add-container">
       <h2>Quick Add Bug</h2>
       <div class="input-group">
         <input type="text" bind:value={$newBugId} placeholder="Enter Bug ID" />
-        <input type="text" bind:value={$quickAddSprintName} placeholder="Enter Sprint Name" />
+        <!-- <input type="text" bind:value={$quickAddSprintName} placeholder="Enter Sprint Name" /> -->
         <button on:click={quickAddBug}>Quick Add Bug</button>
       </div>
     </div>
@@ -440,6 +476,24 @@
                 <span>{$sortDirection === 'asc' ? sortIcons.asc : sortIcons.desc}</span>
               {/if}
             </th>
+            <th class="sortable" on:click={() => sortBugs('priority')}>
+              Priority
+              {#if $sortColumn === 'priority'}
+                <span>{$sortDirection === 'asc' ? sortIcons.asc : sortIcons.desc}</span>
+              {/if}
+            </th>
+            <th class="sortable" on:click={() => sortBugs('product')}>
+              Product
+              {#if $sortColumn === 'product'}
+                <span>{$sortDirection === 'asc' ? sortIcons.asc : sortIcons.desc}</span>
+              {/if}
+            </th>
+            <th class="sortable" on:click={() => sortBugs('component')}>
+              Component
+              {#if $sortColumn === 'component'}
+                <span>{$sortDirection === 'asc' ? sortIcons.asc : sortIcons.desc}</span>
+              {/if}
+            </th>
             <th class="sortable" on:click={() => sortBugs('assigned_to_detail')}>
               Assigned to
               {#if $sortColumn === 'assigned_to_detail'}
@@ -475,8 +529,11 @@
                   alt={bug.type}
                   class="type-icon"
                 />
-              </td>          
+              </td>
               <td>{bug.summary}</td>
+              <td>{bug.priority}</td>
+              <td>{bug.product}</td>
+              <td>{bug.component}</td>
               <td>{bug.assigned_to_detail?.real_name || bug.assigned_to_detail?.email}</td>
               <td 
                 class="status-cell" 
