@@ -18,13 +18,9 @@ export async function GET({ params }) {
       .collection('bugs')
       .get();
 
-    // Map the documents to their bug IDs
     const bugIds = bugsSnapshot.docs.map(doc => doc.data().bugId);
 
-    // Join the bug IDs into a comma-separated string
     const bugIdsString = bugIds.join(',');
-
-    console.log('Comma-separated bug IDs:', bugIdsString);
 
     return json({ bugIds: bugIdsString });
   } catch (err) {

@@ -155,10 +155,47 @@
             }
             const data = await response.json();
             fetchAllBugDetails(data.bugIds);
+            calculateStatusTotals();
         } catch (err) {
             console.error('Error fetching bug IDs:', err);
         }
     };
+
+    const deleteSelectedBugs = async () => {
+        if (checkedBugIds.length === 0) {
+            alert('No bugs selected for deletion.');
+            return;
+        }
+
+        if (!confirm('Are you sure you want to delete the selected bugs from the sprint? This action cannot be undone.')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/teams/${teamId}/sprints/${sprintId}/removebugs`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ bugIds: checkedBugIds }),
+            });
+
+            if (!response.ok) {
+                const errorResponse = await response.json();
+                console.error('Failed to delete bugs from the sprint:', errorResponse);
+                alert(`Failed to delete bugs from the sprint: ${errorResponse.message}`);
+            } else {
+                console.log('Selected bugs were successfully deleted from the sprint.');
+                fetchBugIds(teamId, sprintId);
+                checkedBugIds = [];
+                selectAllChecked.set(false);
+            }
+        } catch (err) {
+            console.error('Error in deleteSelectedBugs:', err);
+            alert('Failed to delete bugs from the sprint.');
+        }
+    };
+
 
     const handleFilterChange = () => {
       const filtered = bugs.filter(bug => {
@@ -194,18 +231,17 @@
 
         try {
             const response = await fetch(`/teams/${teamId}/sprints/${sprintId}/addbugs`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            // Wrap bugId in an array
-            body: JSON.stringify({ bugIds: [bugId] }),
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ bugIds: [bugId] }),
             });
 
             if (!response.ok) {
-            const errorResponse = await response.json();
-            console.error('Failed to add bugs to the sprint:', errorResponse);
-            throw new Error('Failed to add bugs to the sprint.');
+                const errorResponse = await response.json();
+                console.error('Failed to add bugs to the sprint:', errorResponse);
+                throw new Error('Failed to add bugs to the sprint.');
             }
 
             const result = await response.json();
@@ -228,6 +264,7 @@
             bugs = fetchedBugs;
             filteredBugs.set(fetchedBugs);
             error.set(null);
+            calculateStatusTotals();
         } catch (err) {
             console.error('Failed to fetch bug list details:', err);
             error.set('Failed to fetch bug list details');
@@ -391,6 +428,12 @@
           class="selection-button"
           on:click={unselectAllBugs}>
           Unselect All
+        </button>
+        <button
+          class="selection-button"
+          on:click={deleteSelectedBugs}
+          disabled={checkedBugIds.length === 0}>
+          Delete Selected Bugs
         </button>
       </div>
       
