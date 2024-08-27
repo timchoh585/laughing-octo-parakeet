@@ -216,18 +216,19 @@ export async function getBug(bugId: number): Promise<any> {
 // Function to fetch details for multiple bugs based on a list of bug IDs
 export async function getBugsDetails(bugIdsString: string): Promise<any[]> {
   try {
-    // Split the comma-separated string into an array of bug IDs
-    const bugIds = bugIdsString.split(',').map(id => parseInt(id.trim(), 10));
+    const url = `${API_BASE_URL}/bug?id=${bugIdsString}`;
 
-    // Fetch details for each bug
-    const bugDetailsPromises = bugIds.map(bugId => getBug(bugId));
+    const response = await fetch(url);
+    console.log('Response status:', response.status);
+  
+    if (!response.ok) {
+      console.error('Network response was not ok:', response.statusText);
+      throw new Error(`Network response was not ok: ${response.statusText}`);
+    }
 
-    // Wait for all the promises to resolve
-    const bugDetails = await Promise.all(bugDetailsPromises);
+    const data = await response.json();
 
-    console.log('Fetched bug details:', bugDetails);
-
-    return bugDetails;
+    return data.bugs;
   } catch (error) {
     console.error('Failed to fetch bug details:', error);
     throw error;
