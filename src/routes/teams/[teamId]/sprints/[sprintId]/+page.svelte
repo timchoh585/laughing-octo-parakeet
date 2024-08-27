@@ -62,22 +62,23 @@
     const statusList = ['NEW', 'ASSIGNED', 'RESOLVED', 'VERIFIED'];
   
     const fetchSprintName = async (teamId, sprintId) => {
-      try {
-        console.log(`Fetching sprint data for teamId: ${teamId}, sprintId: ${sprintId}`);
-        const response = await fetch(`/teams/${teamId}/sprints/${sprintId}`);
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch sprint data');
+        loading.set(true);
+        try {
+            console.log(`Fetching sprint data for teamId: ${teamId}, sprintId: ${sprintId}`);
+            const response = await fetch(`/teams/${teamId}/sprints/${sprintId}`);
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch sprint data');
+            }
+
+            const sprintData = await response.json();
+            sprintName.set(sprintData.name);
+            quickAddSprintName.set("[" + sprintData.name + "]");
+            fetchBugsByWhiteboard(sprintData.name);
+        } catch (err) {
+            console.error('Failed to fetch sprint name:', err);
+            error.set('Failed to fetch sprint name');
         }
-        
-        const sprintData = await response.json();
-        sprintName.set(sprintData.name);
-        quickAddSprintName.set("[" + sprintData.name + "]");
-        fetchBugsByWhiteboard(sprintData.name);
-      } catch (err) {
-        console.error('Failed to fetch sprint name:', err);
-        error.set('Failed to fetch sprint name');
-      }
     };
   
     const fetchBugsByWhiteboard = async (sprintName) => {
@@ -162,6 +163,7 @@
     };
 
     const deleteSelectedBugs = async () => {
+        loading.set(true);
         if (checkedBugIds.length === 0) {
             alert('No bugs selected for deletion.');
             return;
@@ -222,6 +224,7 @@
     };
 
     const addBugToSprintCollection = async (bugId) => {
+        loading.set(true);
         const teamId = $page.params.teamId;
         const sprintId = $page.params.sprintId;
 
@@ -258,6 +261,7 @@
 
 
     const fetchAllBugDetails = async(bugIds) => {
+        loading.set(true);
         try {
             const fetchedBugs = await getBugsDetails(bugIds);
 
