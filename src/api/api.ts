@@ -194,29 +194,28 @@ export async function updateAttachment(attachmentId: number, attachmentData: any
 //   return data.bugs[0]; // Assuming the API returns an array of bugs
 // }
 
+const includeFields = `&include_fields=id,type,summary,status,resolution,assigned_to,product,component,priority`;
+
 // Fetch bug details for a given bug ID
 export async function getBug(bugId: number): Promise<any> {
   bugId = validateBugId(bugId);
   const url = `${API_BASE_URL}/bug/${bugId}`;
-  console.log('Fetching bug details from URL:', url);  // Log the URL being requested
 
   const response = await fetch(url);
-  console.log('Response status:', response.status);  // Log the response status
+  console.log('Response status:', response.status);
 
   if (!response.ok) {
-    console.error('Network response was not ok:', response.statusText);  // Log the error status
     throw new Error(`Network response was not ok: ${response.statusText}`);
   }
 
   const data = await response.json();
-  console.log('Response data:', data);  // Log the response data
-  return data.bugs[0];  // Assuming the API returns an array of bugs
+  return data.bugs[0];
 }
 
 // Function to fetch details for multiple bugs based on a list of bug IDs
 export async function getBugsDetails(bugIdsString: string): Promise<any[]> {
   try {
-    const url = `${API_BASE_URL}/bug?id=${bugIdsString}`;
+    const url = `${API_BASE_URL}/bug?id=${bugIdsString}` + includeFields;
 
     const response = await fetch(url);
     console.log('Response status:', response.status);
@@ -251,19 +250,16 @@ export async function getBugs(productName: string, componentName: string): Promi
 // List all bugs
 export async function listBugs(): Promise<any> {
   const url = `${API_BASE_URL}/bug?product=Fenix&component=Autofill&resolution=---`;
-  console.log('Fetching bug list from URL:', url);  // Log the URL being requested
+  console.log('Fetching bug list from URL:', url);
 
   const response = await fetch(url);
-  console.log('Response status:', response.status);  // Log the response status
 
   if (!response.ok) {
-    console.error('Network response was not ok:', response.statusText);  // Log the error status
     throw new Error(`Network response was not ok: ${response.statusText}`);
   }
 
   const data = await response.json();
-  console.log('Response data:', data);  // Log the response data
-  return data;  // Assuming the API returns a list of bugs
+  return data;
 }
 
 // Fetch bug history for a given bug ID
