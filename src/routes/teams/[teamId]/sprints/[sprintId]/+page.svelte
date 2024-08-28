@@ -71,15 +71,15 @@
                 filteredBugs.set(cachedBugs);
                 sprintName.set(cachedSprintName);
                 quickAddSprintName.set(`[${cachedSprintName}]`);
-            } else {
-                fetchSprintName(teamId, sprintId);
             }
+
+            fetchSprintNameAndUpdate(teamId, sprintId);
         } else {
             console.error('Missing teamId or sprintId');
         }
     });
 
-    const fetchSprintName = async (teamId, sprintId) => {
+    const fetchSprintNameAndUpdate = async (teamId, sprintId) => {
         loading.set(true);
         try {
             console.log(`Fetching sprint data for teamId: ${teamId}, sprintId: ${sprintId}`);
@@ -95,10 +95,49 @@
 
             setLocalStorage(`${teamId}-${sprintId}-name`, sprintData.name);
 
-            fetchBugsByWhiteboard(sprintData.name);
+            fetchBugIds(teamId, sprintId);
         } catch (err) {
             console.error('Failed to fetch sprint name:', err);
             error.set('Failed to fetch sprint name');
+        }
+    };
+
+    const fetchBugIds = async (teamId, sprintId) => {
+        try {
+            const response = await fetch(`/teams/${teamId}/sprints/${sprintId}/bugs`);
+            if (!response.ok) {
+                throw new Error('Failed to fetch bug IDs');
+            }
+            const data = await response.json();
+            fetchAllBugDetails(data.bugIds);
+        } catch (err) {
+            console.error('Error fetching bug IDs:', err);
+            error.set('Failed to fetch bug IDs');
+        } finally {
+            loading.set(false);
+        }
+    };
+
+    const fetchAllBugDetails = async (bugIds) => {
+        loading.set(true);
+        try {
+            const fetchedBugs = await getBugsDetails(bugIds);
+            const cachedBugs = getLocalStorage(`${teamId}-${sprintId}-bugs`);
+            const isDifferent = JSON.stringify(fetchedBugs) !== JSON.stringify(cachedBugs);
+
+            if (isDifferent) {
+                setLocalStorage(`${teamId}-${sprintId}-bugs`, fetchedBugs);
+                bugs = fetchedBugs;
+                filteredBugs.set(fetchedBugs);
+            }
+
+            error.set(null);
+            calculateStatusTotals();
+        } catch (err) {
+            console.error('Failed to fetch bug list details:', err);
+            error.set('Failed to fetch bug list details');
+        } finally {
+            loading.set(false);
         }
     };
 
@@ -156,20 +195,6 @@
         }, 5000);
     };
 
-    const fetchBugIds = async (teamId, sprintId) => {
-        try {
-            const response = await fetch(`/teams/${teamId}/sprints/${sprintId}/bugs`);
-            if (!response.ok) {
-            throw new Error('Failed to fetch bug IDs');
-            }
-            const data = await response.json();
-            fetchAllBugDetails(data.bugIds);
-            calculateStatusTotals();
-        } catch (err) {
-            console.error('Error fetching bug IDs:', err);
-        }
-    };
-
     const deleteSelectedBugs = async () => {
         loading.set(true);
         if (checkedBugIds.length === 0) {
@@ -221,9 +246,9 @@
         const id = parseInt(get(newBugId), 10);
         if (!isNaN(id) && id > 0) {
             try {
-            await addBugToSprintCollection(id);
+                await addBugToSprintCollection(id);
             } catch (error) {
-            console.error('Failed to add bug:', error);
+                console.error('Failed to add bug:', error);
             }
         } else {
             error.set('Please enter a valid bug ID');
@@ -255,31 +280,24 @@
             }
 
             const result = await response.json();
-            notification.set('Bugs were successfully added to the sprint.');
+            notification.set('Bug was successfully added to the sprint.');
             notificationType.set('success');
+
+            const newBug = await getBug(bugId);
+            bugs = [...bugs, newBug];
+            filteredBugs.set(bugs);
+
+            setLocalStorage(`${teamId}-${sprintId}-bugs`, bugs);
 
             fetchBugIds(teamId, sprintId);
         } catch (err) {
             console.error('Error in addBugToSprintCollection:', err);
             notification.set('Failed to add bugs to the sprint.');
             notificationType.set('error');
+        } finally {
+            loading.set(false);
         }
     };
-
-    const fetchAllBugDetails = async(bugIds) => {
-        loading.set(true);
-        try {
-            const fetchedBugs = await getBugsDetails(bugIds);
-
-            bugs = fetchedBugs;
-            filteredBugs.set(fetchedBugs);
-            error.set(null);
-            calculateStatusTotals();
-        } catch (err) {
-            console.error('Failed to fetch bug list details:', err);
-            error.set('Failed to fetch bug list details');
-        }
-    }
   
     const handleStatusClick = (status) => {
       if (get(selectedStatus) === status) {
@@ -450,10 +468,10 @@
     </div>
   
     <div class="quick-add-container">
-      <h2>Quick Add Bug</h2>
+      <h2>Add Bug To Sprint</h2>
       <div class="input-group">
         <input type="text" bind:value={$newBugId} placeholder="Enter Bug ID" />
-        <button on:click={quickAddBug}>Quick Add Bug</button>
+        <button on:click={quickAddBug}>Add Bug</button>
       </div>
     </div>
   
