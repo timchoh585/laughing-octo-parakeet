@@ -2,23 +2,38 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { writable, derived } from 'svelte/store';
+  import { teamsCache } from '../../stores/sprintStore';
 
   let teams = writable([]);
   let fetchError = writable(null);
   let newTeamName = writable('');
   let searchQuery = writable('');
+  let isLoading = writable(true);
+
+  $: if ($teamsCache.length > 0) {
+    teams.set($teamsCache);
+    isLoading.set(false);
+  }
 
   onMount(async () => {
+    if ($teamsCache.length === 0) {
+      isLoading.set(true);
+    }
+
     try {
       const res = await fetch('/teams');
       if (res.ok) {
-        teams.set(await res.json());
+        const fetchedTeams = await res.json();
+        teamsCache.set(fetchedTeams);
+        teams.set(fetchedTeams);
         fetchError.set(null);
       } else {
         fetchError.set(`Failed to load teams: ${res.statusText}`);
       }
     } catch (err) {
       fetchError.set(`Failed to load teams: ${err.message}`);
+    } finally {
+      isLoading.set(false);
     }
   });
 
@@ -39,7 +54,6 @@
       return;
     }
 
-    // Check if the team name already exists
     const existingTeam = $teams.find(team => team.name.toLowerCase() === trimmedName.toLowerCase());
     if (existingTeam) {
       fetchError.set('A team with this name already exists');
@@ -56,12 +70,12 @@
       });
 
       if (res.ok) {
-        const { id: newTeamId } = await res.json(); // Ensure the correct ID is retrieved from the server
-        teams.update(currentTeams => [...currentTeams, { id: newTeamId, name: trimmedName }]);
+        const { id: newTeamId } = await res.json();
+        const updatedTeams = [...$teams, { id: newTeamId, name: trimmedName }];
+        teamsCache.set(updatedTeams);
+        teams.set(updatedTeams);
         newTeamName.set('');
         fetchError.set(null);
-
-        // Navigate to the newly created team's page only after confirming the team ID
         goto(`/teams/${newTeamId}`);
       } else {
         fetchError.set(`Failed to add team: ${res.statusText}`);
@@ -71,7 +85,6 @@
     }
   };
 </script>
-
 
 <style>
   .container {
@@ -142,28 +155,30 @@
     <p class="error">{$fetchError}</p>
   {/if}
 
-  <!-- Search Bar -->
-  <div class="search-bar">
-    <input 
-      type="text" 
-      placeholder="Search teams..." 
-      bind:value={$searchQuery} />
-  </div>
+  {#if $isLoading && !$teams.length}
+    <p>Loading teams...</p>
+  {:else}
+    <div class="search-bar">
+      <input 
+        type="text" 
+        placeholder="Search teams..." 
+        bind:value={$searchQuery} />
+    </div>
 
-  <!-- Add Team Form -->
-  <div class="add-team">
-    <input 
-      type="text" 
-      placeholder="Enter new team name" 
-      bind:value={$newTeamName} />
-    <button on:click={addTeam}>Add Team</button>
-  </div>
+    <div class="add-team">
+      <input 
+        type="text" 
+        placeholder="Enter new team name" 
+        bind:value={$newTeamName} />
+      <button on:click={addTeam}>Add Team</button>
+    </div>
 
-  <ul class="team-list">
-    {#each $filteredTeams as team}
-      <li on:click={() => handleTeamClick(team.id)}>
-        <span class="team-name">{team.name}</span>
-      </li>
-    {/each}
-  </ul>
+    <ul class="team-list">
+      {#each $filteredTeams as team}
+        <li on:click={() => handleTeamClick(team.id)}>
+          <span class="team-name">{team.name}</span>
+        </li>
+      {/each}
+    </ul>
+  {/if}
 </div>

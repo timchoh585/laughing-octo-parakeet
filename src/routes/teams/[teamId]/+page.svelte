@@ -3,6 +3,7 @@
     import { goto } from '$app/navigation';
     import { page } from '$app/stores';
     import { writable, derived } from 'svelte/store';
+    import { sprintsCache } from '../../../stores/sprintStore';
 
     let sprints = writable([]);
     let newSprintName = writable('');
@@ -11,9 +12,15 @@
     let sortOrder = writable('asc');
     let sprintToDelete = writable(null);
     let deleteConfirmation = writable('');
-    let modalError = writable(null); // Store for error messages in the modal
+    let modalError = writable(null);
+    let isLoading = writable(true);
 
     $: teamId = $page.params.teamId;
+
+    $: if (teamId && $sprintsCache[teamId]) {
+        sprints.set($sprintsCache[teamId]);
+        isLoading.set(false);
+    }
 
     onMount(async () => {
         if (!teamId) {
@@ -21,16 +28,27 @@
             return;
         }
 
+        if (!$sprintsCache[teamId]) {
+            isLoading.set(true);
+        }
+
         try {
             const res = await fetch(`/teams/${teamId}`);
             if (res.ok) {
-                sprints.set(await res.json());
+                const fetchedSprints = await res.json();
+                sprintsCache.update(cache => {
+                    cache[teamId] = fetchedSprints;
+                    return cache;
+                });
+                sprints.set(fetchedSprints);
                 error.set(null);
             } else {
                 error.set(`Failed to load sprints: ${res.statusText}`);
             }
         } catch (err) {
             error.set(`Failed to load sprints: ${err.message}`);
+        } finally {
+            isLoading.set(false);
         }
     });
 
@@ -68,6 +86,10 @@
             if (res.ok) {
                 const newSprint = await res.json();
                 sprints.update(current => [...current, newSprint]);
+                sprintsCache.update(cache => {
+                    cache[teamId] = [...cache[teamId], newSprint];
+                    return cache;
+                });
                 newSprintName.set('');
                 error.set(null);
             } else {
@@ -87,6 +109,10 @@
 
             if (res.ok) {
                 sprints.update(current => current.filter(sprint => sprint.id !== sprintId));
+                sprintsCache.update(cache => {
+                    cache[teamId] = cache[teamId].filter(sprint => sprint.id !== sprintId);
+                    return cache;
+                });
                 sprintToDelete.set(null);
                 deleteConfirmation.set('');
                 modalError.set(null);
@@ -118,9 +144,10 @@
     const closeModal = () => {
         sprintToDelete.set(null);
         deleteConfirmation.set('');
-        modalError.set(null); // Clear modal error when closing
+        modalError.set(null);
     };
 </script>
+
 
 <style>
     .container {
@@ -300,7 +327,9 @@
         </button>
     </div>
 
-    {#if $sprints && $sprints.length > 0}
+    {#if $isLoading && $sprints.length === 0}
+        <p>Loading sprints...</p>
+    {:else if $sprints.length > 0}
         <ul class="sprint-list">
             {#each $sortedSprints as sprint}
                 <li>

@@ -4,17 +4,17 @@
     import { writable, get } from 'svelte/store';
     import { goto } from '$app/navigation';
     import { searchWhiteboard, getBug, getBugsDetails, updateBug } from '../../../../../api/api';
-    import { whiteboardBugCache } from '../../../../../stores/bugStore';
     import defectIcon from '../../../../../resources/img/icons/defect.svg';
     import enhancementIcon from '../../../../../resources/img/icons/enhancement.svg';
     import taskIcon from '../../../../../resources/img/icons/task.svg';
-  
+    import { getLocalStorage, setLocalStorage } from '../../../../../utils/storageUtils';
+
     const typeIcons = {
       defect: defectIcon,
       enhancement: enhancementIcon,
       task: taskIcon,
     };
-  
+
     let selectedStatus = writable('');
     let selectedAssignee = writable('');
     let selectedPriority = writable('');
@@ -29,38 +29,60 @@
     let filteredBugs = writable([]);
     let selectAllChecked = writable(false);
     let sprintBugs = writable([]);
-  
+
     let bugs = [];
     let checkedBugIds = [];
     let sortColumn = writable('');
     let sortDirection = writable('asc');
     let sprintName = writable('');
     let quickAddSprintName = writable('');
-  
+
     let teamId;
     let sprintId;
-  
+
     let selectNonResolvedOrVerifiedText = writable('Select Non-Resolved/Verified');
-  
+
     $: {
       const nonResolvedOrVerifiedBugIds = get(filteredBugs)
         .filter(bug => bug.status !== 'RESOLVED' && bug.status !== 'VERIFIED')
         .map(bug => bug.id);
-  
+
       const allSelected = nonResolvedOrVerifiedBugIds.length > 0 && nonResolvedOrVerifiedBugIds.every(id => checkedBugIds.includes(id));
-  
+
       selectNonResolvedOrVerifiedText.set(allSelected ? 'Deselect Non-Resolved/Verified' : 'Select Non-Resolved/Verified');
     }
-  
+
     const statusColors = {
       NEW: '#f8d7da',
       ASSIGNED: '#e2e3ff',
       RESOLVED: '#d4edda',
       VERIFIED: '#cce5ff'
     };
-  
+
     const statusList = ['NEW', 'ASSIGNED', 'RESOLVED', 'VERIFIED'];
-  
+
+    onMount(() => {
+        teamId = $page.params.teamId;
+        sprintId = $page.params.sprintId;
+
+        if (teamId && sprintId) {
+            // Retrieve cached data from localStorage
+            const cachedBugs = getLocalStorage(`${teamId}-${sprintId}-bugs`);
+            const cachedSprintName = getLocalStorage(`${teamId}-${sprintId}-name`);
+
+            if (cachedBugs && cachedSprintName) {
+                bugs = cachedBugs;
+                filteredBugs.set(cachedBugs);
+                sprintName.set(cachedSprintName);
+                quickAddSprintName.set(`[${cachedSprintName}]`);
+            } else {
+                fetchSprintName(teamId, sprintId);
+            }
+        } else {
+            console.error('Missing teamId or sprintId');
+        }
+    });
+
     const fetchSprintName = async (teamId, sprintId) => {
         loading.set(true);
         try {
@@ -73,45 +95,41 @@
 
             const sprintData = await response.json();
             sprintName.set(sprintData.name);
-            quickAddSprintName.set("[" + sprintData.name + "]");
+            quickAddSprintName.set(`[${sprintData.name}]`);
+
+            // Cache the sprint name in localStorage
+            setLocalStorage(`${teamId}-${sprintId}-name`, sprintData.name);
+
             fetchBugsByWhiteboard(sprintData.name);
         } catch (err) {
             console.error('Failed to fetch sprint name:', err);
             error.set('Failed to fetch sprint name');
+        } finally {
+            loading.set(false);
+        }
+    };
+
+    const fetchBugsByWhiteboard = async (sprintName) => {
+        loading.set(true);
+        try {
+            const data = await searchWhiteboard(sprintName);
+            const fetchedBugs = data.bugs;
+
+            // Cache the bugs in localStorage
+            setLocalStorage(`${teamId}-${sprintId}-bugs`, fetchedBugs);
+
+            error.set(null);
+            addBugsToSprint(fetchedBugs.map(bug => bug.id));
+        } catch (err) {
+            console.error('Failed to fetch bugs:', err);
+            error.set('Failed to fetch bugs');
+        } finally {
+            loading.set(false);
         }
     };
   
-    const fetchBugsByWhiteboard = async (sprintName) => {
-    //   const cachedBugs = get(whiteboardBugCache)[sprintName];
-  
-    //   if (cachedBugs) {
-    //     bugs = cachedBugs;
-    //     filteredBugs.set(cachedBugs);
-    //   } else {
-    //     loading.set(true);
-    //   }
-  
-      try {
-        const data = await searchWhiteboard(sprintName);
-        const fetchedBugs = data.bugs;
-  
-        // if (JSON.stringify(cachedBugs) !== JSON.stringify(fetchedBugs)) {
-        //   bugs = fetchedBugs;
-        //   filteredBugs.set(fetchedBugs);
-        //   whiteboardBugCache.update(cache => ({ ...cache, [sprintName]: fetchedBugs }));
-        // }
-        
-        error.set(null);
-        addBugsToSprint(fetchedBugs.map(bug => bug.id));
-      } catch (err) {
-        console.error('Failed to fetch bugs:', err);
-        error.set('Failed to fetch bugs');
-      } finally {
-        loading.set(false);
-      }
-    };
-  
     const addBugsToSprint = async (bugIds) => {
+        loading.set(true);
         if (!bugIds.length) {
             alert('No bugs found to add to the sprint');
             return;
@@ -198,7 +216,6 @@
         }
     };
 
-
     const handleFilterChange = () => {
       const filtered = bugs.filter(bug => {
         const matchesStatus = !get(selectedStatus) || bug.status === get(selectedStatus);
@@ -259,7 +276,6 @@
         }
     };
 
-
     const fetchAllBugDetails = async(bugIds) => {
         loading.set(true);
         try {
@@ -272,6 +288,8 @@
         } catch (err) {
             console.error('Failed to fetch bug list details:', err);
             error.set('Failed to fetch bug list details');
+        } finally {
+            loading.set(false);
         }
     }
   
@@ -359,18 +377,7 @@
   
       return progress;
     };
-  
-    onMount(() => {
-      teamId = $page.params.teamId;
-      sprintId = $page.params.sprintId;
-  
-      if (teamId && sprintId) {
-        fetchSprintName(teamId, sprintId);
-      } else {
-        console.error('Missing teamId or sprintId');
-      }
-    });
-  
+
     const sortIcons = {
       asc: '▲',
       desc: '▼'
@@ -450,18 +457,12 @@
           {checkedBugIds.length} tickets selected.
         {/if}
       </p>
-      
-      <!-- <div class="update-input-button-row">
-        <input type="text" bind:value={$appendString} placeholder="Enter text to append to whiteboard" />
-        <button on:click={handleUpdateBugs} disabled={$updating}>Update Selected Bugs</button>
-      </div> -->
     </div>
   
     <div class="quick-add-container">
       <h2>Quick Add Bug</h2>
       <div class="input-group">
         <input type="text" bind:value={$newBugId} placeholder="Enter Bug ID" />
-        <!-- <input type="text" bind:value={$quickAddSprintName} placeholder="Enter Sprint Name" /> -->
         <button on:click={quickAddBug}>Quick Add Bug</button>
       </div>
     </div>
@@ -601,4 +602,3 @@
       <p class="no-bugs">No bugs found for this sprint.</p>
     {/if}
   </div>
-  
