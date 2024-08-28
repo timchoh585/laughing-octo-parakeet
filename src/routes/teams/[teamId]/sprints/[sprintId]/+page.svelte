@@ -420,6 +420,10 @@
   
       filteredBugs.set(sorted);
     };
+
+    const navigateToSprints = () => {
+        goto(`/teams/${teamId}`);
+    }
   </script>
   
   <style src="../../../../../styles/styles.css"></style>
@@ -428,6 +432,10 @@
     {#if $error}
       <p class="error">{$error}</p>
     {/if}
+
+    <button
+        class="selection-button"
+        on:click={navigateToSprints}>Back To Sprints</button>
   
     <h1>Bug List for Sprint: {$sprintName}</h1>
   

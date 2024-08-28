@@ -146,8 +146,11 @@
         deleteConfirmation.set('');
         modalError.set(null);
     };
-</script>
 
+    const navigateToTeams = () => {
+        goto(`/teams`);
+    }
+</script>
 
 <style>
     .container {
@@ -310,6 +313,8 @@
 </style>
 
 <div class="container">
+    <button on:click={navigateToTeams}>Back To Teams</button>
+
     <h1>Sprints</h1>
 
     {#if $error}
