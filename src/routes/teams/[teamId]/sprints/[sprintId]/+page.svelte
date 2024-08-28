@@ -19,8 +19,6 @@
     let selectedAssignee = writable('');
     let selectedPriority = writable('');
     let newBugId = writable('');
-    let whiteboardField = writable('');
-    let appendString = writable('');
     let notification = writable('');
     let notificationType = writable('');
     let updating = writable(false);
@@ -28,7 +26,6 @@
     let loading = writable(false);
     let filteredBugs = writable([]);
     let selectAllChecked = writable(false);
-    let sprintBugs = writable([]);
 
     let bugs = [];
     let checkedBugIds = [];
@@ -66,7 +63,6 @@
         sprintId = $page.params.sprintId;
 
         if (teamId && sprintId) {
-            // Retrieve cached data from localStorage
             const cachedBugs = getLocalStorage(`${teamId}-${sprintId}-bugs`);
             const cachedSprintName = getLocalStorage(`${teamId}-${sprintId}-name`);
 
@@ -97,15 +93,12 @@
             sprintName.set(sprintData.name);
             quickAddSprintName.set(`[${sprintData.name}]`);
 
-            // Cache the sprint name in localStorage
             setLocalStorage(`${teamId}-${sprintId}-name`, sprintData.name);
 
             fetchBugsByWhiteboard(sprintData.name);
         } catch (err) {
             console.error('Failed to fetch sprint name:', err);
             error.set('Failed to fetch sprint name');
-        } finally {
-            loading.set(false);
         }
     };
 
@@ -115,7 +108,6 @@
             const data = await searchWhiteboard(sprintName);
             const fetchedBugs = data.bugs;
 
-            // Cache the bugs in localStorage
             setLocalStorage(`${teamId}-${sprintId}-bugs`, fetchedBugs);
 
             error.set(null);
@@ -123,14 +115,12 @@
         } catch (err) {
             console.error('Failed to fetch bugs:', err);
             error.set('Failed to fetch bugs');
-        } finally {
-            loading.set(false);
         }
     };
   
     const addBugsToSprint = async (bugIds) => {
         loading.set(true);
-        if (!bugIds.length) {
+        if (!loading && !bugIds.length) {
             alert('No bugs found to add to the sprint');
             return;
         }
@@ -288,8 +278,6 @@
         } catch (err) {
             console.error('Failed to fetch bug list details:', err);
             error.set('Failed to fetch bug list details');
-        } finally {
-            loading.set(false);
         }
     }
   
@@ -377,6 +365,8 @@
   
       return progress;
     };
+
+    loading.set(false);
 
     const sortIcons = {
       asc: '▲',
