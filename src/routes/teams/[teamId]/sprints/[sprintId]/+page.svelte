@@ -29,6 +29,7 @@
     let sprintName = writable('');
     let quickAddSprintName = writable('');
     let newBugId = writable('');
+    let isExpanded = writable(false);
 
     let teamId;
     let sprintId;
@@ -280,6 +281,11 @@
             bugs = bugsWithCategory;
             filteredBugs.set(bugs);
 
+            const toDoBugs = bugsWithCategory.filter(bug => bug.category === "To Do");
+            for (const bug of toDoBugs) {
+                await checkForInProgress(bug);
+            }
+
             const inProgressBugs = bugsWithCategory.filter(bug => bug.category === 'In Progress');
             for (const bug of inProgressBugs) {
                 await checkForInReview(bug.id);
@@ -298,6 +304,22 @@
             loading.set(false);
         }
     };
+
+    const checkForInProgress = async (bug) => {
+        try {
+            if (bug.assigned_to_detail?.email !== "nobody@mozilla.org") {
+                const newCategory = 'In Progress';
+                await updateBugCategory(bug.id, newCategory);
+                notification.set(`Bug ID ${bug.id} category updated to In Progress.`);
+                notificationType.set('success');
+            }
+            
+        } catch (err) {
+                console.error(`Failed to update category to In Review for Bug ID ${bug.id}:`, err);
+                notification.set(`Failed to update category for Bug ID ${bug.id}.`);
+                notificationType.set('error');
+        }
+    }
 
     const checkForInReview = async (bugId) => {
         try {
@@ -524,16 +546,13 @@
             notification.set('Selected bugs removed successfully.');
             notificationType.set('success');
 
-            // Remove the bugs from the local state
             bugs = bugs.filter(bug => !selectedBugIds.includes(bug.id));
             filteredBugs.set(bugs);
             setLocalStorage(`${teamId}-${sprintId}-bugs`, bugs);
 
-            // Re-categorize and update totals
             categorizedBugs = categorizeBugs();
             categoryTotals = calculateCategoryTotals();
 
-            // Unselect all bugs after removal
             unselectAllBugs();
         } catch (err) {
             notification.set('Failed to remove selected bugs.');
@@ -542,6 +561,10 @@
         } finally {
             loading.set(false);
         }
+    };
+
+    const toggleExpand = () => {
+        isExpanded.update(expanded => !expanded);
     };
 </script>
 
@@ -627,6 +650,21 @@
             {/each}
         </div>
 
+        <div class="tooltip-container">
+            <button on:click={toggleExpand}>
+                Click for more info
+            </button>
+            <div class="tooltip-text">
+                Information about the Current Categories
+                <div class={`expandable-area ${$isExpanded ? 'expanded' : ''}`}>
+                    <p>To Do: unassigned tickets</p>
+                    <p>In Progress: assigned tickets with no patch</p>
+                    <p>In Review: tickets with patches</p>
+                    <p>Done: completed tickets with landed patches</p>
+                </div>
+            </div>
+        </div>
+
         {#each categories as { key, label }}
             {#if categorizedBugs[key] && categorizedBugs[key].length > 0}
                 <h2>{label}</h2>
@@ -664,8 +702,9 @@
                                 {#if $sortConfig.key === 'assigned_to_detail'}
                                     <span>{$sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
                                 {/if}
-                            </th>                            
-                            <th>Change Category</th>
+                            </th>
+                            <th>Change Category
+                            </th>
                         </tr>
                     </thead>
                     <tbody>
