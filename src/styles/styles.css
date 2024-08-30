@@ -383,6 +383,33 @@ h1 {
   background-color: #45a049;
 }
 
+.add-bug-container {
+  display: flex;
+  margin-bottom: 1rem;
+}
+
+.bug-id-input {
+  flex-grow: 1;
+  margin-right: 0.5rem;
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.add-bug-container button {
+  padding: 0.5rem 1rem;
+  border: none;
+  background-color: #007bff;
+  color: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.add-bug-container button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
 /* Row View Styles */
 .bug-table {
   width: 100%;

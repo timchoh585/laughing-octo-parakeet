@@ -26,6 +26,7 @@
     let filteredBugs = writable([]);
     let sprintName = writable('');
     let quickAddSprintName = writable('');
+    let newBugId = writable('');
 
     let teamId;
     let sprintId;
@@ -40,8 +41,8 @@
     let bugs = [];
 
     let sortConfig = writable({
-        key: null,   // The key of the property to sort by (e.g., 'id', 'summary')
-        direction: 'asc'  // The direction of the sort, either 'asc' or 'desc'
+        key: null,
+        direction: 'asc'
     });
 
     const statusToCategory = {
@@ -374,6 +375,120 @@
         categoryTotals = calculateCategoryTotals();
     };
 
+    const addBugToSprint = async () => {
+        const bugId = Number(get(newBugId).trim());
+
+        if (!bugId) {
+            notification.set('Please enter a valid Bug ID.');
+            notificationType.set('error');
+            return;
+        }
+
+        try {
+            loading.set(true);
+
+            const bugIds = [bugId];
+
+            const response = await fetch(`/teams/${teamId}/sprints/${sprintId}/addbugs`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ bugIds }),
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Failed to add bug: ${errorText}`);
+            }
+
+            const addedSprintData = await response.json();
+
+            const fetchedBugs = await getBugsDetails([bugId]);
+
+            const bugsWithCategory = await Promise.all(fetchedBugs.map(async (bug) => {
+                let category = statusToCategory[bug.status] || 'To Do';
+
+                if (!validCategories.includes(category)) {
+                    category = statusToCategory[bug.status] || 'To Do';
+                    try {
+                        await updateBugCategory(bug.id, category);
+                    } catch (updateError) {
+                        console.error(`Failed to update bug category in database for Bug ID ${bug.id}:`, updateError);
+                    }
+                }
+
+                return {
+                    ...bug,
+                    category,
+                };
+            }));
+
+            bugs = [...bugs, ...bugsWithCategory];
+            filteredBugs.set(bugs);
+            setLocalStorage(`${teamId}-${sprintId}-bugs`, bugs);
+
+            categorizedBugs = categorizeBugs();
+            categoryTotals = calculateCategoryTotals();
+
+            notification.set(`Bug ID ${bugId} added successfully.`);
+            notificationType.set('success');
+            newBugId.set('');
+        } catch (err) {
+            notification.set(`Failed to add Bug ID ${bugId}.`);
+            notificationType.set('error');
+        } finally {
+            loading.set(false);
+        }
+    };
+
+    const removeSelectedBugs = async () => {
+        const selectedBugIds = Object.values(get(checkedBugIdsByCategory)).flat();
+
+        if (selectedBugIds.length === 0) {
+            notification.set('No bugs selected for removal.');
+            notificationType.set('error');
+            return;
+        }
+
+        try {
+            loading.set(true);
+
+            const response = await fetch(`/teams/${teamId}/sprints/${sprintId}/removebugs`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ bugIds: selectedBugIds }),
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Failed to remove bugs: ${errorText}`);
+            }
+
+            notification.set('Selected bugs removed successfully.');
+            notificationType.set('success');
+
+            // Remove the bugs from the local state
+            bugs = bugs.filter(bug => !selectedBugIds.includes(bug.id));
+            filteredBugs.set(bugs);
+            setLocalStorage(`${teamId}-${sprintId}-bugs`, bugs);
+
+            // Re-categorize and update totals
+            categorizedBugs = categorizeBugs();
+            categoryTotals = calculateCategoryTotals();
+
+            // Unselect all bugs after removal
+            unselectAllBugs();
+        } catch (err) {
+            notification.set('Failed to remove selected bugs.');
+            notificationType.set('error');
+            console.error('Error removing selected bugs:', err);
+        } finally {
+            loading.set(false);
+        }
+    };
 </script>
 
 <style src="../../../../../styles/styles.css"></style>
@@ -396,8 +511,9 @@
             </button>
             <button
                 class="selection-button"
+                on:click={removeSelectedBugs}
                 disabled={Object.values($checkedBugIdsByCategory).flat().length === 0}>
-                Delete Selected Bugs
+                Remove Selected Bugs
             </button>
         </div>
 
@@ -410,6 +526,18 @@
                 {Object.values($checkedBugIdsByCategory).flat().length} tickets selected.
             {/if}
         </p>
+
+        <div class="add-bug-container">
+            <input
+                type="text"
+                placeholder="Enter Bug ID"
+                bind:value={$newBugId}
+                class="bug-id-input"
+            />
+            <button on:click={addBugToSprint} disabled={$loading || !$newBugId.trim()}>
+                Add Bug
+            </button>
+        </div>
     </div>
 
     {#if $loading && !$filteredBugs.length}
