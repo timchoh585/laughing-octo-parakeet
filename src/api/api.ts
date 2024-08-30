@@ -181,6 +181,35 @@ export async function updateAttachment(attachmentId: number, attachmentData: any
   return data;
 }
 
+const GITHUB_PR_CONTENT_TYPE = 'text/vnd.github.v3+json';
+const PHABRICATOR_REQUEST_CONTENT_TYPE = 'text/x-phabricator-request';
+
+// Check if a bug has a review attachment
+export async function hasReviewAttachment(bugId: number): Promise<boolean | string> {
+  bugId = validateBugId(bugId);
+  
+  const response = await fetch(`${API_BASE_URL}/bug/${bugId}/attachment`);
+  if (!response.ok) {
+    throw new Error('Network response was not ok');
+  }
+  
+  const content = await response.json();
+
+  if (content.bugs && content.bugs[bugId]) {
+    for (const attachment of content.bugs[bugId]) {
+      if (
+        attachment.content_type === GITHUB_PR_CONTENT_TYPE ||
+        attachment.content_type === PHABRICATOR_REQUEST_CONTENT_TYPE
+      ) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+
 // --------------- Bugs ---------------
 
 // // Fetch bug details for a given bug ID

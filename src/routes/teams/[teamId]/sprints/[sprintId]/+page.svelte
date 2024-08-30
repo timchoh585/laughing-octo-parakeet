@@ -3,60 +3,136 @@
     import { page } from '$app/stores';
     import { writable, get } from 'svelte/store';
     import { goto } from '$app/navigation';
-    import { searchWhiteboard, getBug, getBugsDetails, updateBug } from '../../../../../api/api';
+    import { getBugsDetails, hasReviewAttachment } from '../../../../../api/api';
     import defectIcon from '../../../../../resources/img/icons/defect.svg';
     import enhancementIcon from '../../../../../resources/img/icons/enhancement.svg';
     import taskIcon from '../../../../../resources/img/icons/task.svg';
     import { getLocalStorage, setLocalStorage } from '../../../../../utils/storageUtils';
 
     const typeIcons = {
-      defect: defectIcon,
-      enhancement: enhancementIcon,
-      task: taskIcon,
+        defect: defectIcon,
+        enhancement: enhancementIcon,
+        task: taskIcon,
     };
 
-    let selectedStatus = writable('');
+    let selectedCategory = writable('');
     let selectedAssignee = writable('');
     let selectedPriority = writable('');
-    let newBugId = writable('');
     let notification = writable('');
     let notificationType = writable('');
     let updating = writable(false);
     let error = writable(null);
     let loading = writable(false);
     let filteredBugs = writable([]);
-    let selectAllChecked = writable(false);
-
-    let bugs = [];
-    let checkedBugIds = [];
-    let sortColumn = writable('');
-    let sortDirection = writable('asc');
     let sprintName = writable('');
     let quickAddSprintName = writable('');
 
     let teamId;
     let sprintId;
 
-    let selectNonResolvedOrVerifiedText = writable('Select Non-Resolved/Verified');
+    let checkedBugIdsByCategory = writable({
+        todo: [],
+        inProgress: [],
+        inReview: [],
+        done: []
+    });
 
-    $: {
-      const nonResolvedOrVerifiedBugIds = get(filteredBugs)
-        .filter(bug => bug.status !== 'RESOLVED' && bug.status !== 'VERIFIED')
-        .map(bug => bug.id);
+    let bugs = [];
 
-      const allSelected = nonResolvedOrVerifiedBugIds.length > 0 && nonResolvedOrVerifiedBugIds.every(id => checkedBugIds.includes(id));
+    let sortConfig = writable({
+        key: null,   // The key of the property to sort by (e.g., 'id', 'summary')
+        direction: 'asc'  // The direction of the sort, either 'asc' or 'desc'
+    });
 
-      selectNonResolvedOrVerifiedText.set(allSelected ? 'Deselect Non-Resolved/Verified' : 'Select Non-Resolved/Verified');
-    }
-
-    const statusColors = {
-      NEW: '#f8d7da',
-      ASSIGNED: '#e2e3ff',
-      RESOLVED: '#d4edda',
-      VERIFIED: '#cce5ff'
+    const statusToCategory = {
+        'NEW': 'To Do',
+        'ASSIGNED': 'To Do',
+        'IN_PROGRESS': 'In Progress',
+        'IN_REVIEW': 'In Review',
+        'RESOLVED': 'Done',
+        'VERIFIED': 'Done'
     };
 
-    const statusList = ['NEW', 'ASSIGNED', 'RESOLVED', 'VERIFIED'];
+    const validCategories = ['To Do', 'In Progress', 'In Review', 'Done'];
+
+    const categoryColors = {
+        'todo': '#f8d7da',
+        'inProgress': '#ffe8a1',
+        'inReview': '#fff3cd',
+        'done': '#d4edda',
+    };
+
+    const categoryOptions = [
+        { label: 'To Do', value: 'To Do' },
+        { label: 'In Progress', value: 'In Progress' },
+        { label: 'In Review', value: 'In Review' },
+        { label: 'Done', value: 'Done' }
+    ];
+
+    const categories = [
+        { key: 'todo', label: 'To Do' },
+        { key: 'inProgress', label: 'In Progress' },
+        { key: 'inReview', label: 'In Review' },
+        { key: 'done', label: 'Done' }
+    ];
+
+    const initializeBugs = () => ({
+        todo: [],
+        inProgress: [],
+        inReview: [],
+        done: []
+    });
+
+    const categorizeBugs = () => {
+        const categorized = initializeBugs();
+        const currentFilteredBugs = get(filteredBugs);
+
+        currentFilteredBugs.forEach(bug => {
+            const category = bug.category || 'Unknown';
+
+            if (category === 'To Do') {
+                categorized.todo.push(bug);
+            } else if (category === 'In Progress') {
+                categorized.inProgress.push(bug);
+            } else if (category === 'In Review') {
+                categorized.inReview.push(bug);
+            } else if (category === 'Done') {
+                categorized.done.push(bug);
+            }
+        });
+
+        return categorized;
+    };
+
+    const calculateCategoryTotals = () => {
+        const totals = {
+            todo: 0,
+            inProgress: 0,
+            inReview: 0,
+            done: 0
+        };
+
+        const currentFilteredBugs = get(filteredBugs);
+
+        currentFilteredBugs.forEach(bug => {
+            const category = bug.category || 'Unknown';
+
+            if (category === 'To Do') {
+                totals.todo += 1;
+            } else if (category === 'In Progress') {
+                totals.inProgress += 1;
+            } else if (category === 'In Review') {
+                totals.inReview += 1;
+            } else if (category === 'Done') {
+                totals.done += 1;
+            }
+        });
+
+        return totals;
+    };
+
+    let categorizedBugs = initializeBugs();
+    let categoryTotals = initializeBugs();
 
     onMount(() => {
         teamId = $page.params.teamId;
@@ -67,554 +143,367 @@
             const cachedSprintName = getLocalStorage(`${teamId}-${sprintId}-name`);
 
             if (cachedBugs && cachedSprintName) {
-                bugs = cachedBugs;
-                filteredBugs.set(cachedBugs);
+                bugs = cachedBugs.map(bug => ({
+                    ...bug,
+                    category: bug.category || 'To Do'
+                }));
+                filteredBugs.set(bugs);
                 sprintName.set(cachedSprintName);
                 quickAddSprintName.set(`[${cachedSprintName}]`);
             }
 
             fetchSprintNameAndUpdate(teamId, sprintId);
-        } else {
-            console.error('Missing teamId or sprintId');
         }
+
+        categorizedBugs = categorizeBugs();
+        categoryTotals = calculateCategoryTotals();
     });
 
     const fetchSprintNameAndUpdate = async (teamId, sprintId) => {
         loading.set(true);
         try {
-            console.log(`Fetching sprint data for teamId: ${teamId}, sprintId: ${sprintId}`);
             const response = await fetch(`/teams/${teamId}/sprints/${sprintId}`);
-
-            if (!response.ok) {
-                throw new Error('Failed to fetch sprint data');
-            }
-
+            if (!response.ok) throw new Error('Failed to fetch sprint data');
             const sprintData = await response.json();
             sprintName.set(sprintData.name);
             quickAddSprintName.set(`[${sprintData.name}]`);
-
             setLocalStorage(`${teamId}-${sprintId}-name`, sprintData.name);
+            await fetchBugIdsAndDetails(teamId, sprintId);
 
-            fetchBugIds(teamId, sprintId);
+            categorizedBugs = categorizeBugs();
+            categoryTotals = calculateCategoryTotals();
         } catch (err) {
-            console.error('Failed to fetch sprint name:', err);
             error.set('Failed to fetch sprint name');
-        }
-    };
-
-    const fetchBugIds = async (teamId, sprintId) => {
-        try {
-            const response = await fetch(`/teams/${teamId}/sprints/${sprintId}/bugs`);
-            if (!response.ok) {
-                throw new Error('Failed to fetch bug IDs');
-            }
-            const data = await response.json();
-            fetchAllBugDetails(data.bugIds);
-        } catch (err) {
-            console.error('Error fetching bug IDs:', err);
-            error.set('Failed to fetch bug IDs');
         } finally {
             loading.set(false);
         }
     };
 
-    const fetchAllBugDetails = async (bugIds) => {
+    const fetchBugIdsAndDetails = async (teamId, sprintId) => {
+        try {
+            const response = await fetch(`/teams/${teamId}/sprints/${sprintId}/bugs`);
+            if (!response.ok) throw new Error('Failed to fetch bug IDs and categories');
+            const data = await response.json();
+            const bugDetails = data.bugs;
+            await fetchAllBugDetails(bugDetails);
+
+            categorizedBugs = categorizeBugs();
+            categoryTotals = calculateCategoryTotals();
+        } catch (err) {
+            error.set('Failed to fetch bug IDs and categories');
+        } finally {
+            loading.set(false);
+        }
+    };
+
+    const fetchAllBugDetails = async (bugDetails) => {
         loading.set(true);
         try {
+            const bugIds = bugDetails.map(bug => bug.bugId);
             const fetchedBugs = await getBugsDetails(bugIds);
-            const cachedBugs = getLocalStorage(`${teamId}-${sprintId}-bugs`);
-            const isDifferent = JSON.stringify(fetchedBugs) !== JSON.stringify(cachedBugs);
 
-            if (isDifferent) {
-                setLocalStorage(`${teamId}-${sprintId}-bugs`, fetchedBugs);
-                bugs = fetchedBugs;
-                filteredBugs.set(fetchedBugs);
+            const bugsWithCategory = await Promise.all(fetchedBugs.map(async (bug) => {
+                const matchingBug = bugDetails.find(detail => detail.bugId === bug.id);
+                let category = matchingBug?.category || statusToCategory[bug.status] || 'To Do';
+
+                if (!validCategories.includes(category)) {
+                    category = statusToCategory[bug.status] || 'To Do';
+                    try {
+                        await updateBugCategory(bug.id, category);
+                    } catch (updateError) {
+                        console.error(`Failed to update bug category in database for Bug ID ${bug.id}:`, updateError);
+                    }
+                }
+
+                return {
+                    ...bug,
+                    category,
+                };
+            }));
+
+            setLocalStorage(`${teamId}-${sprintId}-bugs`, bugsWithCategory);
+            bugs = bugsWithCategory;
+            filteredBugs.set(bugs);
+
+            const inProgressBugs = bugsWithCategory.filter(bug => bug.category === 'In Progress');
+            for (const bug of inProgressBugs) {
+                await checkForInReview(bug.id);
             }
 
-            error.set(null);
-            calculateStatusTotals();
+            const inReviewBugs = bugsWithCategory.filter(bug => bug.category === "In Review");
+            for (const bug of inReviewBugs) {
+                await checkForDone(bug);
+            }
+
+            categorizedBugs = categorizeBugs();
+            categoryTotals = calculateCategoryTotals();
         } catch (err) {
-            console.error('Failed to fetch bug list details:', err);
             error.set('Failed to fetch bug list details');
         } finally {
             loading.set(false);
         }
     };
 
-    const fetchBugsByWhiteboard = async (sprintName) => {
-        loading.set(true);
+    const checkForInReview = async (bugId) => {
         try {
-            const data = await searchWhiteboard(sprintName);
-            const fetchedBugs = data.bugs;
+            const bugHasReview = await hasReviewAttachment(bugId);
 
-            setLocalStorage(`${teamId}-${sprintId}-bugs`, fetchedBugs);
-
-            error.set(null);
-            addBugsToSprint(fetchedBugs.map(bug => bug.id));
-        } catch (err) {
-            console.error('Failed to fetch bugs:', err);
-            error.set('Failed to fetch bugs');
-        }
-    };
-  
-    const addBugsToSprint = async (bugIds) => {
-        loading.set(true);
-        if (!loading && !bugIds.length) {
-            alert('No bugs found to add to the sprint');
-            return;
-        }
-
-        try {
-            const response = await fetch(`/teams/${teamId}/sprints/${sprintId}/addbugs`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ bugIds }),
-            });
-
-            if (!response.ok) {
-                const errorResponse = await response.json();
-                console.error('Failed to add bugs to the sprint:', errorResponse);
-                alert(`Failed to add bugs to the sprint: ${errorResponse.message}`);
+            if (bugHasReview) {
+                const newCategory = 'In Review';
+                await updateBugCategory(bugId, newCategory);
+                notification.set('Bug category updated successfully.');
+                notificationType.set('success');
             }
-
-            const result = await response.json();
-            notification.set('Bugs were successfully added to the sprint.');
-            notificationType.set('success');
-
-            fetchBugIds(teamId, sprintId);
         } catch (err) {
-            console.error('Error in addBugsToSprint:', err);
-            notification.set('Failed to add bugs to the sprint.');
+            console.error(`Failed to update bug with ID ${bugId}:`, err);
+            error.set(`Failed to update bug with ID ${bugId}`);
+            notification.set('Failed to update In Progress Bugs');
             notificationType.set('error');
         }
-
-        setTimeout(() => {
-            notification.set('');
-        }, 5000);
     };
 
-    const deleteSelectedBugs = async () => {
-        loading.set(true);
-        if (checkedBugIds.length === 0) {
-            alert('No bugs selected for deletion.');
-            return;
-        }
-
-        if (!confirm('Are you sure you want to delete the selected bugs from the sprint? This action cannot be undone.')) {
-            return;
-        }
-
-        try {
-            const response = await fetch(`/teams/${teamId}/sprints/${sprintId}/removebugs`, {
-                method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ bugIds: checkedBugIds }),
-            });
-
-            if (!response.ok) {
-                const errorResponse = await response.json();
-                console.error('Failed to delete bugs from the sprint:', errorResponse);
-                alert(`Failed to delete bugs from the sprint: ${errorResponse.message}`);
-            } else {
-                console.log('Selected bugs were successfully deleted from the sprint.');
-                fetchBugIds(teamId, sprintId);
-                checkedBugIds = [];
-                selectAllChecked.set(false);
-            }
-        } catch (err) {
-            console.error('Error in deleteSelectedBugs:', err);
-            alert('Failed to delete bugs from the sprint.');
-        }
-    };
-
-    const handleFilterChange = () => {
-      const filtered = bugs.filter(bug => {
-        const matchesStatus = !get(selectedStatus) || bug.status === get(selectedStatus);
-        const matchesAssignee = !get(selectedAssignee) ||
-          (bug.assigned_to_detail?.real_name || bug.assigned_to_detail?.email) === get(selectedAssignee);
-        const matchesPriority = !get(selectedPriority) || bug.priority === get(selectedPriority);
-        return matchesStatus && matchesAssignee && matchesPriority;
-      });
-      filteredBugs.set(filtered);
-    };
-
-    const quickAddBug = async () => {
-        const id = parseInt(get(newBugId), 10);
-        if (!isNaN(id) && id > 0) {
+    const checkForDone = async (bug) => {
+        if (bug.resolution && bug.resolution.trim() !== '') {
             try {
-                await addBugToSprintCollection(id);
-            } catch (error) {
-                console.error('Failed to add bug:', error);
+                await updateBugCategory(bug.id, 'Done');
+                notification.set(`Bug ID ${bug.id} category updated to Done.`);
+                notificationType.set('success');
+            } catch (err) {
+                console.error(`Failed to update category to Done for Bug ID ${bug.id}:`, err);
+                notification.set(`Failed to update category for Bug ID ${bug.id}.`);
+                notificationType.set('error');
             }
-        } else {
-            error.set('Please enter a valid bug ID');
         }
     };
 
-    const addBugToSprintCollection = async (bugId) => {
-        loading.set(true);
-        const teamId = $page.params.teamId;
-        const sprintId = $page.params.sprintId;
-
-        if (!teamId || !sprintId) {
-            throw new Error('teamId or sprintId is missing');
+    const updateBugCategory = async (bugId, newCategory) => {
+        if (!newCategory) {
+            console.error('No category provided for updateBugCategory');
+            return;
         }
 
+        loading.set(true);
         try {
-            const response = await fetch(`/teams/${teamId}/sprints/${sprintId}/addbugs`, {
-                method: 'POST',
+            const response = await fetch(`/teams/${teamId}/sprints/${sprintId}/bugs/${bugId}`, {
+                method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ bugIds: [bugId] }),
+                body: JSON.stringify({ teamId, sprintId, bugId, newCategory }),
             });
-
             if (!response.ok) {
-                const errorResponse = await response.json();
-                console.error('Failed to add bugs to the sprint:', errorResponse);
-                throw new Error('Failed to add bugs to the sprint.');
+                const errorText = await response.text();
+                throw new Error(`Failed to update bug category: ${errorText}`);
             }
-
-            const result = await response.json();
-            notification.set('Bug was successfully added to the sprint.');
+            const updatedBug = await response.json();
+            bugs = bugs.map(bug => bug.id === bugId ? { ...bug, category: newCategory } : bug);
+            filteredBugs.set(bugs);
+            setLocalStorage(`${teamId}-${sprintId}-bugs`, bugs);
+            notification.set('Bug category updated successfully.');
             notificationType.set('success');
 
-            const newBug = await getBug(bugId);
-            bugs = [...bugs, newBug];
-            filteredBugs.set(bugs);
-
-            setLocalStorage(`${teamId}-${sprintId}-bugs`, bugs);
-
-            fetchBugIds(teamId, sprintId);
+            categorizedBugs = categorizeBugs();
+            categoryTotals = calculateCategoryTotals();
         } catch (err) {
-            console.error('Error in addBugToSprintCollection:', err);
-            notification.set('Failed to add bugs to the sprint.');
+            notification.set('Failed to update bug category.');
             notificationType.set('error');
         } finally {
             loading.set(false);
         }
     };
-  
-    const handleStatusClick = (status) => {
-      if (get(selectedStatus) === status) {
-        selectedStatus.set('');
-      } else {
-        selectedStatus.set(status);
-      }
-      handleFilterChange();
+
+    const toggleSelectAll = (category) => {
+        const currentChecked = get(checkedBugIdsByCategory)[category];
+        const categoryBugs = categorizedBugs[category] || [];
+
+        checkedBugIdsByCategory.update((ids) => {
+            const updatedIds = { ...ids };
+            updatedIds[category] = currentChecked.length === categoryBugs.length ? [] : categoryBugs.map(bug => bug.id);
+            return updatedIds;
+        });
     };
-  
-    const toggleSelectAll = () => {
-      const isChecked = get(selectAllChecked);
-      const filtered = get(filteredBugs);
-  
-      if (isChecked) {
-        checkedBugIds = [];
-      } else {
-        checkedBugIds = filtered.map(bug => bug.id);
-      }
-  
-      selectAllChecked.set(!isChecked);
-  
-      console.log("Selected tickets after toggleSelectAll:", checkedBugIds);
+
+    const handleCheckboxChange = (bugId, category) => {
+        checkedBugIdsByCategory.update((ids) => {
+            const updatedIds = { ...ids };
+            if (updatedIds[category].includes(bugId)) {
+                updatedIds[category] = updatedIds[category].filter(id => id !== bugId);
+            } else {
+                updatedIds[category] = [...updatedIds[category], bugId];
+            }
+            return updatedIds;
+        });
     };
-  
-    const flipSelectedBugs = () => {
-      const filtered = get(filteredBugs);
-      const selectedBugIds = new Set(checkedBugIds);
-  
-      checkedBugIds = filtered
-        .filter(bug => !selectedBugIds.has(bug.id))
-        .map(bug => bug.id);
-  
-      console.log("Selected tickets after flipSelectedBugs:", checkedBugIds);
-  
-      selectAllChecked.set(checkedBugIds.length === filtered.length);
-    };
-  
-    const selectNonResolvedOrVerified = () => {
-      const filtered = get(filteredBugs);
-      const nonResolvedOrVerifiedBugs = filtered.filter(bug => bug.status !== 'RESOLVED' && bug.status !== 'VERIFIED');
-      const nonResolvedOrVerifiedBugIds = nonResolvedOrVerifiedBugs.map(bug => bug.id);
-      const allSelected = nonResolvedOrVerifiedBugIds.every(id => checkedBugIds.includes(id));
-  
-      if (allSelected) {
-        checkedBugIds = checkedBugIds.filter(id => !nonResolvedOrVerifiedBugIds.includes(id));
-      } else {
-        checkedBugIds = [...new Set([...checkedBugIds, ...nonResolvedOrVerifiedBugIds])];
-      }
-  
-      selectAllChecked.set(checkedBugIds.length === filtered.length);
-  
-      console.log("Selected tickets after selectNonResolvedOrVerified:", checkedBugIds);
-    };
-  
+
     const unselectAllBugs = () => {
-      checkedBugIds = [];
-      selectAllChecked.set(false);
-    };
-  
-    const handleCheckboxChange = (bugId) => {
-      if (checkedBugIds.includes(bugId)) {
-        checkedBugIds = checkedBugIds.filter(id => id !== bugId);
-      } else {
-        checkedBugIds = [...checkedBugIds, bugId];
-      }
-  
-      console.log("Selected tickets after handleCheckboxChange:", checkedBugIds);
-    };
-  
-    const calculateStatusTotals = () => {
-      const totals = statusList.reduce((acc, status) => {
-          acc[status] = bugs.filter(bug => bug.status === status).length;
-          return acc;
-      }, {});
-  
-      const totalBugs = bugs.length;
-      const progress = statusList.map(status => ({
-          status,
-          count: totals[status],
-          percentage: totalBugs > 0 ? (totals[status] / totalBugs) * 100 : 0
-      }));
-  
-      return progress;
-    };
-
-    loading.set(false);
-
-    const sortIcons = {
-      asc: '▲',
-      desc: '▼'
-    };
-  
-    const sortBugs = (column) => {
-      if (get(sortColumn) === column) {
-        sortDirection.set(get(sortDirection) === 'asc' ? 'desc' : 'asc');
-      } else {
-        sortColumn.set(column);
-        sortDirection.set('asc');
-      }
-  
-      const sorted = [...get(filteredBugs)].sort((a, b) => {
-        let aValue, bValue;
-  
-        if (column === 'assigned_to_detail') {
-          aValue = a.assigned_to_detail?.real_name?.toLowerCase() || a.assigned_to_detail?.email?.toLowerCase() || '';
-          bValue = b.assigned_to_detail?.real_name?.toLowerCase() || b.assigned_to_detail?.email?.toLowerCase() || '';
-        } else {
-          aValue = a[column];
-          bValue = b[column];
-  
-          if (typeof aValue === 'string') aValue = aValue.toLowerCase();
-          if (typeof bValue === 'string') bValue = bValue.toLowerCase();
-        }
-  
-        if (aValue > bValue) return get(sortDirection) === 'asc' ? 1 : -1;
-        if (aValue < bValue) return get(sortDirection) === 'asc' ? -1 : 1;
-        return 0;
-      });
-  
-      filteredBugs.set(sorted);
+        checkedBugIdsByCategory.set(initializeBugs());
     };
 
     const navigateToSprints = () => {
         goto(`/teams/${teamId}`);
-    }
-  </script>
-  
-  <style src="../../../../../styles/styles.css"></style>
-  
-  <div class="container {$updating ? 'disabled' : ''}">
+    };
+
+    const sortBugs = (key) => {
+        sortConfig.update(currentConfig => {
+            let direction = 'asc';
+            if (currentConfig.key === key && currentConfig.direction === 'asc') {
+                direction = 'desc';
+            }
+            return { key, direction };
+        });
+
+        filteredBugs.update(currentBugs => {
+            return currentBugs.slice().sort((a, b) => {
+                const sortDirection = get(sortConfig).direction;
+
+                let aValue = a[key];
+                let bValue = b[key];
+
+                if (key === 'assigned_to_detail') {
+                    aValue = a.assigned_to_detail?.email || '';
+                    bValue = b.assigned_to_detail?.email || '';
+                }
+
+                if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+                if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+                return 0;
+            });
+        });
+
+        categorizedBugs = categorizeBugs();
+        categoryTotals = calculateCategoryTotals();
+    };
+
+</script>
+
+<style src="../../../../../styles/styles.css"></style>
+
+<div class="container {$updating ? 'disabled' : ''}">
     {#if $error}
-      <p class="error">{$error}</p>
+        <p class="error">{$error}</p>
     {/if}
 
-    <button
-        class="selection-button"
-        on:click={navigateToSprints}>Back To Sprints</button>
-  
+    <button class="selection-button" on:click={navigateToSprints}>Back To Sprints</button>
+
     <h1>Bug List for Sprint: {$sprintName}</h1>
-  
+
     <div class="update-whiteboard-container">
-      <div class="selection-buttons-row">
-        <button 
-          class="selection-button" 
-          on:click={selectNonResolvedOrVerified}>
-          {$selectNonResolvedOrVerifiedText}
-        </button>
-        <button
-          class="selection-button"
-          on:click={flipSelectedBugs}>
-          Flip Selection
-        </button>
-        <button
-          class="selection-button"
-          on:click={unselectAllBugs}>
-          Unselect All
-        </button>
-        <button
-          class="selection-button"
-          on:click={deleteSelectedBugs}
-          disabled={checkedBugIds.length === 0}>
-          Delete Selected Bugs
-        </button>
-      </div>
-      
-      <p class="selected-bugs-info">
-        {#if checkedBugIds.length === 0}
-          No tickets selected.
-        {:else if checkedBugIds.length === 1}
-          1 ticket selected.
-        {:else}
-          {checkedBugIds.length} tickets selected.
-        {/if}
-      </p>
+        <div class="selection-buttons-row">
+            <button
+                class="selection-button"
+                on:click={unselectAllBugs}>
+                Unselect All
+            </button>
+            <button
+                class="selection-button"
+                disabled={Object.values($checkedBugIdsByCategory).flat().length === 0}>
+                Delete Selected Bugs
+            </button>
+        </div>
+
+        <p class="selected-bugs-info">
+            {#if Object.values($checkedBugIdsByCategory).flat().length === 0}
+                No tickets selected.
+            {:else if Object.values($checkedBugIdsByCategory).flat().length === 1}
+                1 ticket selected.
+            {:else}
+                {Object.values($checkedBugIdsByCategory).flat().length} tickets selected.
+            {/if}
+        </p>
     </div>
-  
-    <div class="quick-add-container">
-      <h2>Add Bug To Sprint</h2>
-      <div class="input-group">
-        <input type="text" bind:value={$newBugId} placeholder="Enter Bug ID" />
-        <button on:click={quickAddBug}>Add Bug</button>
-      </div>
-    </div>
-  
-    {#if $notification}
-      <p class="notification {`notification-${$notificationType}`}" role="alert">
-        {$notification}
-      </p>
-    {/if}
-  
+
     {#if $loading && !$filteredBugs.length}
-      <p class="loading">Loading...</p>
+        <p class="loading">Loading...</p>
     {/if}
-  
+
     {#if $filteredBugs.length > 0}
-      <div class="progress-bar-container" role="progressbar" aria-valuemin="0" aria-valuemax="100">
-        {#each calculateStatusTotals() as { status, percentage, count }}
-          {#if percentage > 0}
-            <div
-              class="progress-segment"
-              tabindex="0"
-              style="width: {percentage}%; background-color: {statusColors[status]}"
-              on:click={() => handleStatusClick(status)}
-              aria-label="{status} ({count} tickets, {percentage.toFixed(1)}%)"
-              role="button"
-            >
-              {status} ({count})
-            </div>
-          {/if}
+        <div class="progress-bar-container" role="progressbar" aria-valuemin="0" aria-valuemax="100">
+            {#each Object.entries(categoryTotals) as [category, count]}
+                {#if count > 0}
+                    <div
+                        class="progress-segment"
+                        tabindex="0"
+                        style="width: {count / $filteredBugs.length * 100}%; background-color: {categoryColors[category] || '#ccc'}"
+                        aria-label="{category} ({count} tickets, {(count / $filteredBugs.length * 100).toFixed(1)}%)"
+                        role="button"
+                    >
+                        {category} ({count})
+                    </div>
+                {/if}
+            {/each}
+        </div>
+
+        {#each categories as { key, label }}
+            {#if categorizedBugs[key] && categorizedBugs[key].length > 0}
+                <h2>{label}</h2>
+                <table class="bug-table">
+                    <thead>
+                        <tr>
+                            <th>
+                                Bulk Edit
+                                <button
+                                    class="selection-button {($checkedBugIdsByCategory[key] || []).length === categorizedBugs[key].length ? 'active' : ''}"
+                                    on:click={() => toggleSelectAll(key)}>
+                                    {($checkedBugIdsByCategory[key] || []).length === categorizedBugs[key].length ? 'Deselect All' : 'Select All'}
+                                </button>
+                            </th>
+                            <th class="sortable" on:click={() => sortBugs('id')}>
+                                ID
+                                {#if $sortConfig.key === 'id'}
+                                    <span>{$sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
+                                {/if}
+                            </th>
+                            <th class="sortable" on:click={() => sortBugs('summary')}>
+                                Summary
+                                {#if $sortConfig.key === 'summary'}
+                                    <span>{$sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
+                                {/if}
+                            </th>
+                            <th class="sortable" on:click={() => sortBugs('component')}>
+                                Component
+                                {#if $sortConfig.key === 'component'}
+                                    <span>{$sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
+                                {/if}
+                            </th>
+                            <th class="sortable" on:click={() => sortBugs('assigned_to_detail')}>
+                                Assigned to
+                                {#if $sortConfig.key === 'assigned_to_detail'}
+                                    <span>{$sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
+                                {/if}
+                            </th>                            
+                            <th>Change Category</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {#each categorizedBugs[key] as bug}
+                            <tr>
+                                <td>
+                                    <button
+                                        class="selection-button {($checkedBugIdsByCategory[key] || []).includes(bug.id) ? 'active' : ''}"
+                                        on:click={() => handleCheckboxChange(bug.id, key)}>
+                                        {($checkedBugIdsByCategory[key] || []).includes(bug.id) ? 'Deselect' : 'Select'}
+                                    </button>
+                                </td>
+                                <td><a href={`/bugs/${bug.id}`}>{bug.id}</a></td>
+                                <td>{bug.summary}</td>
+                                <td>{bug.component}</td>
+                                <td>{bug.assigned_to_detail?.real_name || bug.assigned_to_detail?.email}</td>
+                                <td>
+                                    <select on:change={(e) => updateBugCategory(bug.id, e.target.value)}>
+                                        {#each categoryOptions as option}
+                                            <option value={option.value} selected={bug.category === option.value}>
+                                                {option.label}
+                                            </option>
+                                        {/each}
+                                    </select>
+                                </td>
+                            </tr>
+                        {/each}
+                    </tbody>
+                </table>
+            {/if}
         {/each}
-      </div>
-    
-      <table class="bug-table">
-        <thead>
-          <tr>
-            <th>
-              Bulk Edit
-              <button
-                class="selection-button {$selectAllChecked ? 'active' : ''}"
-                on:click={toggleSelectAll}>
-                {$selectAllChecked ? 'Deselect All' : 'Select All'}
-              </button>
-            </th>
-            <th class="sortable" on:click={() => sortBugs('id')}>
-              ID
-              {#if $sortColumn === 'id'}
-                <span>{$sortDirection === 'asc' ? sortIcons.asc : sortIcons.desc}</span>
-              {/if}
-            </th>
-            <th class="sortable" on:click={() => sortBugs('type')}>
-              Type
-              {#if $sortColumn === 'type'}
-                <span>{$sortDirection === 'asc' ? sortIcons.asc : sortIcons.desc}</span>
-              {/if}
-            </th>
-            <th class="sortable" on:click={() => sortBugs('summary')}>
-              Summary
-              {#if $sortColumn === 'summary'}
-                <span>{$sortDirection === 'asc' ? sortIcons.asc : sortIcons.desc}</span>
-              {/if}
-            </th>
-            <th class="sortable" on:click={() => sortBugs('priority')}>
-              Priority
-              {#if $sortColumn === 'priority'}
-                <span>{$sortDirection === 'asc' ? sortIcons.asc : sortIcons.desc}</span>
-              {/if}
-            </th>
-            <th class="sortable" on:click={() => sortBugs('product')}>
-              Product
-              {#if $sortColumn === 'product'}
-                <span>{$sortDirection === 'asc' ? sortIcons.asc : sortIcons.desc}</span>
-              {/if}
-            </th>
-            <th class="sortable" on:click={() => sortBugs('component')}>
-              Component
-              {#if $sortColumn === 'component'}
-                <span>{$sortDirection === 'asc' ? sortIcons.asc : sortIcons.desc}</span>
-              {/if}
-            </th>
-            <th class="sortable" on:click={() => sortBugs('assigned_to_detail')}>
-              Assigned to
-              {#if $sortColumn === 'assigned_to_detail'}
-                <span>{$sortDirection === 'asc' ? sortIcons.asc : sortIcons.desc}</span>
-              {/if}
-            </th>
-            <th class="sortable" on:click={() => sortBugs('status')}>
-              Status
-              {#if $sortColumn === 'status'}
-                <span>{$sortDirection === 'asc' ? sortIcons.asc : sortIcons.desc}</span>
-              {/if}
-            </th>
-            <th class="sortable" on:click={() => sortBugs('resolution')}>
-              Resolution
-              {#if $sortColumn === 'resolution'}
-                <span>{$sortDirection === 'asc' ? sortIcons.asc : sortIcons.desc}</span>
-              {/if}
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each $filteredBugs as bug}
-            <tr>
-              <td on:click={() => handleCheckboxChange(bug.id)}>
-                <button class="selection-button {checkedBugIds.includes(bug.id) ? 'active' : ''}">
-                  {checkedBugIds.includes(bug.id) ? 'Deselect' : 'Select'}
-                </button>
-              </td>
-              <td><a href={`/bugs/${bug.id}`}>{bug.id}</a></td>
-              <td>
-                <img
-                  src={typeIcons[bug.type.toLowerCase()]}
-                  alt={bug.type}
-                  class="type-icon"
-                />
-              </td>
-              <td>{bug.summary}</td>
-              <td>{bug.priority}</td>
-              <td>{bug.product}</td>
-              <td>{bug.component}</td>
-              <td>{bug.assigned_to_detail?.real_name || bug.assigned_to_detail?.email}</td>
-              <td 
-                class="status-cell" 
-                style="
-                  --status-color: {statusColors[bug.status]};
-                  --status-color-r: {parseInt(statusColors[bug.status].slice(1, 3), 16)};
-                  --status-color-g: {parseInt(statusColors[bug.status].slice(3, 5), 16)};
-                  --status-color-b: {parseInt(statusColors[bug.status].slice(5, 7), 16)};
-                ">
-                {bug.status}
-              </td>
-              <td>{bug.resolution}</td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
     {:else if !$loading && !$filteredBugs.length}
-      <p class="no-bugs">No bugs found for this sprint.</p>
+        <p class="no-bugs">No bugs found for this sprint.</p>
     {/if}
-  </div>
+</div>

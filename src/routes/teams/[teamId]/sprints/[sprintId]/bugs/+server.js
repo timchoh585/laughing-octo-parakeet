@@ -18,11 +18,15 @@ export async function GET({ params }) {
       .collection('bugs')
       .get();
 
-    const bugIds = bugsSnapshot.docs.map(doc => doc.data().bugId);
+    const bugs = bugsSnapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        bugId: data.bugId,
+        category: data.category || 'Unknown'
+      };
+    });
 
-    const bugIdsString = bugIds.join(',');
-
-    return json({ bugIds: bugIdsString });
+    return json({ bugs });
   } catch (err) {
     console.error('Failed to fetch sprint bugs:', err);
     throw error(500, 'Failed to fetch sprint bugs');
