@@ -655,7 +655,7 @@
                 Click for more info
             </button>
             <div class="tooltip-text">
-                Information about the Current Categories
+                Information about the Auto-Sorted Current Categories
                 <div class={`expandable-area ${$isExpanded ? 'expanded' : ''}`}>
                     <p>To Do: unassigned tickets</p>
                     <p>In Progress: assigned tickets with no patch</p>
