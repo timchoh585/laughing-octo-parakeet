@@ -18,6 +18,8 @@
     let selectedCategory = writable('');
     let selectedAssignee = writable('');
     let selectedPriority = writable('');
+    let selectedSprint = writable('');
+    let availableSprints = writable([]);
     let notification = writable('');
     let notificationType = writable('');
     let updating = writable(false);
@@ -132,6 +134,56 @@
         return totals;
     };
 
+    const fetchAvailableSprints = async () => {
+        try {
+            const response = await fetch(`/teams/${teamId}`);
+            if (!response.ok) throw new Error('Failed to fetch sprints');
+            const sprints = await response.json();
+            availableSprints.set(sprints.filter(sprint => sprint.id !== sprintId));
+        } catch (err) {
+            console.error('Failed to fetch sprints:', err);
+            error.set('Failed to fetch available sprints');
+        }
+    };
+
+    const rollOverBugsToSprint = async () => {
+        const targetSprintId = get(selectedSprint);
+        const sourceSprintId = sprintId;
+        const selectedBugIds = Object.values(get(checkedBugIdsByCategory)).flat();
+
+        if (!targetSprintId || selectedBugIds.length === 0) {
+            notification.set('Please select a sprint and some bugs.');
+            notificationType.set('error');
+            return;
+        }
+
+        try {
+            loading.set(true);
+            const response = await fetch(`/teams/${teamId}/sprints/${targetSprintId}/rollover`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ bugIds: selectedBugIds, sourceSprintId }),
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Failed to roll over bugs: ${errorText}`);
+            }
+
+            notification.set('Bugs rolled over successfully.');
+            notificationType.set('success');
+            unselectAllBugs();
+        } catch (err) {
+            notification.set('Failed to roll over selected bugs.');
+            notificationType.set('error');
+            console.error('Error rolling over selected bugs:', err);
+        } finally {
+            loading.set(false);
+        }
+    };
+
     let categorizedBugs = initializeBugs();
     let categoryTotals = initializeBugs();
 
@@ -155,6 +207,8 @@
 
             fetchSprintNameAndUpdate(teamId, sprintId);
         }
+
+        fetchAvailableSprints();
 
         categorizedBugs = categorizeBugs();
         categoryTotals = calculateCategoryTotals();
@@ -526,6 +580,18 @@
                 {Object.values($checkedBugIdsByCategory).flat().length} tickets selected.
             {/if}
         </p>
+
+        <div class="rollover-container">
+            <select bind:value={$selectedSprint}>
+                <option value="" disabled>Select Sprint</option>
+                {#each $availableSprints as sprint}
+                    <option value={sprint.id}>{sprint.name}</option>
+                {/each}
+            </select>
+            <button on:click={rollOverBugsToSprint} disabled={$loading || !$selectedSprint}>
+                Roll Over Selected Bugs
+            </button>
+        </div>
 
         <div class="add-bug-container">
             <input
