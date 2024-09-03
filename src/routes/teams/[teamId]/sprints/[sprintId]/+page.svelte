@@ -629,6 +629,12 @@
         </div>
     </div>
 
+    {#if $notification}
+        <div class="notification-banner {$notificationType}">
+            <span>{$notification}</span>
+        </div>
+    {/if}
+
     {#if $loading && !$filteredBugs.length}
         <p class="loading">Loading...</p>
     {/if}
