@@ -709,8 +709,6 @@
                                     <span>{$sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
                                 {/if}
                             </th>
-                            <th>Change Category
-                            </th>
                         </tr>
                     </thead>
                     <tbody>
@@ -727,15 +725,6 @@
                                 <td>{bug.summary}</td>
                                 <td>{bug.component}</td>
                                 <td>{bug.assigned_to_detail?.real_name || bug.assigned_to_detail?.email}</td>
-                                <td>
-                                    <select on:change={(e) => updateBugCategory(bug.id, e.target.value)}>
-                                        {#each categoryOptions as option}
-                                            <option value={option.value} selected={bug.category === option.value}>
-                                                {option.label}
-                                            </option>
-                                        {/each}
-                                    </select>
-                                </td>
                             </tr>
                         {/each}
                     </tbody>
