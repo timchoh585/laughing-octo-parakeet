@@ -201,7 +201,10 @@ export async function hasReviewAttachment(bugId: number): Promise<boolean | stri
         attachment.content_type === GITHUB_PR_CONTENT_TYPE ||
         attachment.content_type === PHABRICATOR_REQUEST_CONTENT_TYPE
       ) {
-        return true;
+        const match = attachment.file_name.match(/phabricator-(D\d+)-url\.txt/);
+        if (match && match[1]) {
+            return `https://phabricator.services.mozilla.com/${match[1]}`;
+        }
       }
     }
   }

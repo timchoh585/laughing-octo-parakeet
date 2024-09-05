@@ -271,9 +271,12 @@
                     }
                 }
 
+                const reviewAttachmentUrl = category === 'In Review' ? await hasReviewAttachment(bug.id) : null;
+
                 return {
                     ...bug,
                     category,
+                    reviewAttachmentUrl,
                 };
             }));
 
@@ -673,62 +676,129 @@
 
         {#each categories as { key, label }}
             {#if categorizedBugs[key] && categorizedBugs[key].length > 0}
-                <h2>{label}</h2>
-                <table class="bug-table">
-                    <thead>
-                        <tr>
-                            <th>
-                                Bulk Edit
-                                <button
-                                    class="selection-button {($checkedBugIdsByCategory[key] || []).length === categorizedBugs[key].length ? 'active' : ''}"
-                                    on:click={() => toggleSelectAll(key)}>
-                                    {($checkedBugIdsByCategory[key] || []).length === categorizedBugs[key].length ? 'Deselect All' : 'Select All'}
-                                </button>
-                            </th>
-                            <th class="sortable" on:click={() => sortBugs('id')}>
-                                ID
-                                {#if $sortConfig.key === 'id'}
-                                    <span>{$sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
-                                {/if}
-                            </th>
-                            <th class="sortable" on:click={() => sortBugs('summary')}>
-                                Summary
-                                {#if $sortConfig.key === 'summary'}
-                                    <span>{$sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
-                                {/if}
-                            </th>
-                            <th class="sortable" on:click={() => sortBugs('component')}>
-                                Component
-                                {#if $sortConfig.key === 'component'}
-                                    <span>{$sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
-                                {/if}
-                            </th>
-                            <th class="sortable" on:click={() => sortBugs('assigned_to_detail')}>
-                                Assigned to
-                                {#if $sortConfig.key === 'assigned_to_detail'}
-                                    <span>{$sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
-                                {/if}
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {#each categorizedBugs[key] as bug}
+                {#if key === "inReview"}
+                    <h2>In Review</h2>
+                    <table class="bug-table">
+                        <thead>
                             <tr>
-                                <td>
+                                <th>
+                                    Bulk Edit
                                     <button
-                                        class="selection-button {($checkedBugIdsByCategory[key] || []).includes(bug.id) ? 'active' : ''}"
-                                        on:click={() => handleCheckboxChange(bug.id, key)}>
-                                        {($checkedBugIdsByCategory[key] || []).includes(bug.id) ? 'Deselect' : 'Select'}
+                                        class="selection-button {($checkedBugIdsByCategory.inReview || []).length === categorizedBugs.inReview.length ? 'active' : ''}"
+                                        on:click={() => toggleSelectAll('inReview')}>
+                                        {($checkedBugIdsByCategory.inReview || []).length === categorizedBugs.inReview.length ? 'Deselect All' : 'Select All'}
                                     </button>
-                                </td>
-                                <td><a href={`/bugs/${bug.id}`}>{bug.id}</a></td>
-                                <td>{bug.summary}</td>
-                                <td>{bug.component}</td>
-                                <td>{bug.assigned_to_detail?.real_name || bug.assigned_to_detail?.email}</td>
+                                </th>
+                                <th class="sortable" on:click={() => sortBugs('id')}>
+                                    ID
+                                    {#if $sortConfig.key === 'id'}
+                                        <span>{$sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
+                                    {/if}
+                                </th>
+                                <th class="sortable" on:click={() => sortBugs('summary')}>
+                                    Summary
+                                    {#if $sortConfig.key === 'summary'}
+                                        <span>{$sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
+                                    {/if}
+                                </th>
+                                <th class="sortable" on:click={() => sortBugs('component')}>
+                                    Component
+                                    {#if $sortConfig.key === 'component'}
+                                        <span>{$sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
+                                    {/if}
+                                </th>
+                                <th class="sortable" on:click={() => sortBugs('assigned_to_detail')}>
+                                    Assigned to
+                                    {#if $sortConfig.key === 'assigned_to_detail'}
+                                        <span>{$sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
+                                    {/if}
+                                </th>
+                                <th>Review Link</th>
                             </tr>
-                        {/each}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            {#each categorizedBugs.inReview as bug}
+                                <tr>
+                                    <td>
+                                        <button
+                                            class="selection-button {($checkedBugIdsByCategory.inReview || []).includes(bug.id) ? 'active' : ''}"
+                                            on:click={() => handleCheckboxChange(bug.id, 'inReview')}>
+                                            {($checkedBugIdsByCategory.inReview || []).includes(bug.id) ? 'Deselect' : 'Select'}
+                                        </button>
+                                    </td>
+                                    <td><a href={`/bugs/${bug.id}`}>{bug.id}</a></td>
+                                    <td>{bug.summary}</td>
+                                    <td>{bug.component}</td>
+                                    <td>{bug.assigned_to_detail?.real_name || bug.assigned_to_detail?.email}</td>
+                                    <td>
+                                        {#if bug.reviewAttachmentUrl}
+                                            <a href={bug.reviewAttachmentUrl} target="_blank">Review Link</a>
+                                        {:else}
+                                            No review attachment
+                                        {/if}
+                                    </td>
+                                </tr>
+                            {/each}
+                        </tbody>
+                    </table>
+                {:else}
+                    <h2>{label}</h2>
+                    <table class="bug-table">
+                        <thead>
+                            <tr>
+                                <th>
+                                    Bulk Edit
+                                    <button
+                                        class="selection-button {($checkedBugIdsByCategory[key] || []).length === categorizedBugs[key].length ? 'active' : ''}"
+                                        on:click={() => toggleSelectAll(key)}>
+                                        {($checkedBugIdsByCategory[key] || []).length === categorizedBugs[key].length ? 'Deselect All' : 'Select All'}
+                                    </button>
+                                </th>
+                                <th class="sortable" on:click={() => sortBugs('id')}>
+                                    ID
+                                    {#if $sortConfig.key === 'id'}
+                                        <span>{$sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
+                                    {/if}
+                                </th>
+                                <th class="sortable" on:click={() => sortBugs('summary')}>
+                                    Summary
+                                    {#if $sortConfig.key === 'summary'}
+                                        <span>{$sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
+                                    {/if}
+                                </th>
+                                <th class="sortable" on:click={() => sortBugs('component')}>
+                                    Component
+                                    {#if $sortConfig.key === 'component'}
+                                        <span>{$sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
+                                    {/if}
+                                </th>
+                                <th class="sortable" on:click={() => sortBugs('assigned_to_detail')}>
+                                    Assigned to
+                                    {#if $sortConfig.key === 'assigned_to_detail'}
+                                        <span>{$sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
+                                    {/if}
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {#each categorizedBugs[key] as bug}
+                                <tr>
+                                    <td>
+                                        <button
+                                            class="selection-button {($checkedBugIdsByCategory[key] || []).includes(bug.id) ? 'active' : ''}"
+                                            on:click={() => handleCheckboxChange(bug.id, key)}>
+                                            {($checkedBugIdsByCategory[key] || []).includes(bug.id) ? 'Deselect' : 'Select'}
+                                        </button>
+                                    </td>
+                                    <td><a href={`/bugs/${bug.id}`}>{bug.id}</a></td>
+                                    <td>{bug.summary}</td>
+                                    <td>{bug.component}</td>
+                                    <td>{bug.assigned_to_detail?.real_name || bug.assigned_to_detail?.email}</td>
+                                </tr>
+                            {/each}
+                        </tbody>
+                    </table>
+                {/if}
             {/if}
         {/each}
     {:else if !$loading && !$filteredBugs.length}
